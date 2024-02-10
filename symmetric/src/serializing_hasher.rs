@@ -1,17 +1,18 @@
 use p3_field::{PrimeField32, PrimeField64};
+use proptest_derive::Arbitrary;
 
 use crate::CryptographicHasher;
 
 /// Maps input field elements to their 4-byte little-endian encodings, and maps output of the form
 /// `[u8; 32]` to `[F; 8]`.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Arbitrary, Debug)]
 pub struct SerializingHasher32<Inner> {
     inner: Inner,
 }
 
 /// Maps input field elements to their 8-byte little-endian encodings, and maps output of the form
 /// `[u8; 32]` to `[F; 4]`.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Arbitrary, Debug)]
 pub struct SerializingHasher64<Inner> {
     inner: Inner,
 }
