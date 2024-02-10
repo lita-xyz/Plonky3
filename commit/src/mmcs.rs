@@ -4,6 +4,7 @@ use core::fmt::Debug;
 
 use p3_matrix::dense::RowMajorMatrix;
 use p3_matrix::{Dimensions, Matrix, MatrixRows};
+use proptest::prelude::Arbitrary;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -19,10 +20,10 @@ use serde::Serialize;
 /// The `DirectMmcs` sub-trait represents an MMS which can be directly constructed from a set of
 /// matrices. Other MMCSs may be virtual combinations of child MMCSs, or may be constructed in a
 /// streaming manner.
-pub trait Mmcs<T>: Clone {
+pub trait Mmcs<T>: Clone + Arbitrary + Debug {
     type ProverData;
-    type Commitment: Clone + Serialize + DeserializeOwned;
-    type Proof: Serialize + DeserializeOwned;
+    type Commitment: Clone + Serialize + DeserializeOwned + Arbitrary;
+    type Proof: Serialize + DeserializeOwned + Arbitrary;
     type Error: Debug;
     type Mat<'a>: MatrixRows<T> + Sync
     where

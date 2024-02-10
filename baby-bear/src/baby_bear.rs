@@ -6,7 +6,6 @@ use p3_field::{
     exp_1725656503, exp_u64_by_squaring, AbstractField, Field, PrimeField, PrimeField32,
     PrimeField64, TwoAdicField,
 };
-use proptest::prelude::Arbitrary;
 use proptest_derive::Arbitrary;
 use rand::distributions::{Distribution, Standard};
 use rand::Rng;

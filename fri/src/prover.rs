@@ -1,5 +1,6 @@
 use alloc::vec;
 use alloc::vec::Vec;
+use proptest::prelude::Arbitrary;
 
 use itertools::Itertools;
 use p3_challenger::{CanObserve, CanSample, GrindingChallenger};
@@ -12,7 +13,7 @@ use crate::fold_even_odd::fold_even_odd;
 use crate::{CommitPhaseProofStep, FriConfig, FriProof, QueryProof};
 
 #[instrument(name = "FRI prover", skip_all)]
-pub fn prove<F, M, Challenger>(
+pub fn prove<F: Arbitrary, M, Challenger>(
     config: &FriConfig<M>,
     input: &[Option<Vec<F>>; 32],
     challenger: &mut Challenger,
@@ -50,7 +51,7 @@ where
     )
 }
 
-fn answer_query<F, M>(
+fn answer_query<F: Arbitrary, M>(
     config: &FriConfig<M>,
     commit_phase_commits: &[M::ProverData],
     index: usize,

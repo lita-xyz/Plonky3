@@ -1,6 +1,9 @@
 use alloc::vec::Vec;
 use core::cmp::Reverse;
+use core::fmt::Debug;
 use core::marker::PhantomData;
+use proptest::prelude::Arbitrary;
+use proptest_derive::Arbitrary;
 
 use itertools::Itertools;
 use p3_commit::{DirectMmcs, Mmcs};
@@ -19,14 +22,15 @@ use crate::FieldMerkleTree;
 /// - `P`: a leaf value TODO
 /// - `H`: the leaf hasher
 /// - `C`: the digest compression function
-#[derive(Copy, Clone)]
-pub struct FieldMerkleTreeMmcs<P, H, C, const DIGEST_ELEMS: usize> {
+#[derive(Copy, Clone, Debug, Arbitrary)]
+pub struct FieldMerkleTreeMmcs<P, H, C: Arbitrary, const DIGEST_ELEMS: usize> {
     hash: H,
     compress: C,
     _phantom: PhantomData<P>,
 }
 
-impl<P, H, C, const DIGEST_ELEMS: usize> FieldMerkleTreeMmcs<P, H, C, DIGEST_ELEMS> {
+impl<P, H, C: Arbitrary, const DIGEST_ELEMS: usize>
+  FieldMerkleTreeMmcs<P, H, C, DIGEST_ELEMS> {
     pub fn new(hash: H, compress: C) -> Self {
         Self {
             hash,
@@ -39,13 +43,14 @@ impl<P, H, C, const DIGEST_ELEMS: usize> FieldMerkleTreeMmcs<P, H, C, DIGEST_ELE
 impl<P, H, C, const DIGEST_ELEMS: usize> Mmcs<P::Scalar>
     for FieldMerkleTreeMmcs<P, H, C, DIGEST_ELEMS>
 where
-    P: PackedField,
+    P: PackedField + Arbitrary,
+    P::Scalar: Arbitrary,
     H: CryptographicHasher<P::Scalar, [P::Scalar; DIGEST_ELEMS]>,
     H: CryptographicHasher<P, [P; DIGEST_ELEMS]>,
-    H: Sync,
+    H: Sync + Arbitrary,
     C: PseudoCompressionFunction<[P::Scalar; DIGEST_ELEMS], 2>,
     C: PseudoCompressionFunction<[P; DIGEST_ELEMS], 2>,
-    C: Sync,
+    C: Sync + Debug + Arbitrary,
     [P::Scalar; DIGEST_ELEMS]: Serialize + for<'de> Deserialize<'de>,
 {
     type ProverData = FieldMerkleTree<P::Scalar, DIGEST_ELEMS>;
@@ -153,13 +158,14 @@ where
 impl<P, H, C, const DIGEST_ELEMS: usize> DirectMmcs<P::Scalar>
     for FieldMerkleTreeMmcs<P, H, C, DIGEST_ELEMS>
 where
-    P: PackedField,
+    P: PackedField + Arbitrary,
+    P::Scalar: Arbitrary,
     H: CryptographicHasher<P::Scalar, [P::Scalar; DIGEST_ELEMS]>,
     H: CryptographicHasher<P, [P; DIGEST_ELEMS]>,
-    H: Sync,
+    H: Sync + Arbitrary,
     C: PseudoCompressionFunction<[P::Scalar; DIGEST_ELEMS], 2>,
     C: PseudoCompressionFunction<[P; DIGEST_ELEMS], 2>,
-    C: Sync,
+    C: Sync + Arbitrary,
     [P::Scalar; DIGEST_ELEMS]: Serialize + for<'de> Deserialize<'de>,
 {
     fn commit(

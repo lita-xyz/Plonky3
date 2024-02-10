@@ -1,8 +1,9 @@
+extern crate std;
+
 use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt::{Debug, Formatter};
 use core::marker::PhantomData;
-
 use itertools::{izip, Itertools};
 use p3_challenger::{CanObserve, CanSample, FieldChallenger, GrindingChallenger};
 use p3_commit::{DirectMmcs, Mmcs, OpenedValues, Pcs, UnivariatePcs, UnivariatePcsWithLde};
@@ -18,6 +19,8 @@ use p3_matrix::{Dimensions, Matrix, MatrixRows};
 use p3_maybe_rayon::prelude::*;
 use p3_util::linear_map::LinearMap;
 use p3_util::{log2_strict_usize, reverse_bits_len, reverse_slice_index_bits, VecExt};
+use proptest::prelude::Arbitrary;
+use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use tracing::{info_span, instrument};
 
@@ -27,7 +30,7 @@ use crate::{prover, FriConfig, FriProof};
 /// We group all of our type bounds into this trait to reduce duplication across signatures.
 pub trait TwoAdicFriPcsGenericConfig: Default {
     type Val: TwoAdicField;
-    type Challenge: TwoAdicField + ExtensionField<Self::Val>;
+    type Challenge: TwoAdicField + ExtensionField<Self::Val> + Arbitrary;
     type Challenger: FieldChallenger<Self::Val>
         + GrindingChallenger<Witness = Self::Val>
         + CanObserve<<Self::FriMmcs as Mmcs<Self::Challenge>>::Commitment>
@@ -53,7 +56,7 @@ impl<Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs> TwoAdicFriPcsGenericCo
     for TwoAdicFriPcsConfig<Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs>
 where
     Val: TwoAdicField,
-    Challenge: TwoAdicField + ExtensionField<Val>,
+    Challenge: TwoAdicField + ExtensionField<Val> + Arbitrary,
     Challenger: FieldChallenger<Val>
         + GrindingChallenger<Witness = Val>
         + CanObserve<<FriMmcs as Mmcs<Challenge>>::Commitment>
@@ -98,7 +101,7 @@ impl<C: TwoAdicFriPcsGenericConfig> Debug for VerificationError<C> {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Arbitrary)]
 #[serde(bound = "")]
 pub struct TwoAdicFriPcsProof<C: TwoAdicFriPcsGenericConfig> {
     pub(crate) fri_proof: FriProof<C::Challenge, C::FriMmcs, C::Val>,
@@ -106,7 +109,7 @@ pub struct TwoAdicFriPcsProof<C: TwoAdicFriPcsGenericConfig> {
     pub(crate) query_openings: Vec<Vec<BatchOpening<C>>>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Arbitrary)]
 pub struct BatchOpening<C: TwoAdicFriPcsGenericConfig> {
     pub(crate) opened_values: Vec<Vec<C::Val>>,
     pub(crate) opening_proof: <C::InputMmcs as Mmcs<C::Val>>::Proof,

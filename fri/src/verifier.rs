@@ -7,6 +7,7 @@ use p3_commit::Mmcs;
 use p3_field::{Field, TwoAdicField};
 use p3_matrix::Dimensions;
 use p3_util::reverse_bits_len;
+use proptest::prelude::Arbitrary;
 
 use crate::{FriConfig, FriProof, QueryProof};
 
@@ -24,7 +25,7 @@ pub struct FriChallenges<F> {
     betas: Vec<F>,
 }
 
-pub fn verify_shape_and_sample_challenges<F, M, Challenger>(
+pub fn verify_shape_and_sample_challenges<F: Arbitrary, M, Challenger>(
     config: &FriConfig<M>,
     proof: &FriProof<F, M, Challenger::Witness>,
     challenger: &mut Challenger,
@@ -64,7 +65,7 @@ where
     })
 }
 
-pub fn verify_challenges<F, M, Witness>(
+pub fn verify_challenges<F: Arbitrary, M, Witness>(
     config: &FriConfig<M>,
     proof: &FriProof<F, M, Witness>,
     challenges: &FriChallenges<F>,
@@ -98,7 +99,7 @@ where
     Ok(())
 }
 
-fn verify_query<F, M>(
+fn verify_query<F: Arbitrary, M>(
     config: &FriConfig<M>,
     commit_phase_commits: &[M::Commitment],
     mut index: usize,

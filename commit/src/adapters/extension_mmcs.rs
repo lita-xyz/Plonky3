@@ -1,5 +1,8 @@
 use alloc::vec::Vec;
+use core::fmt::Debug;
 use core::marker::PhantomData;
+use proptest::prelude::Arbitrary;
+use proptest_derive::Arbitrary;
 
 use p3_field::{AbstractExtensionField, ExtensionField, Field};
 use p3_matrix::dense::RowMajorMatrix;
@@ -7,7 +10,7 @@ use p3_matrix::{Dimensions, Matrix, MatrixRows};
 
 use crate::{DirectMmcs, Mmcs};
 
-#[derive(Clone)]
+#[derive(Clone, Debug, Arbitrary)]
 pub struct ExtensionMmcs<F, EF, InnerMmcs> {
     inner: InnerMmcs,
     _phantom: PhantomData<(F, EF)>,
@@ -26,7 +29,7 @@ impl<F, EF, InnerMmcs> Mmcs<EF> for ExtensionMmcs<F, EF, InnerMmcs>
 where
     F: Field,
     EF: ExtensionField<F>,
-    InnerMmcs: Mmcs<F>,
+    InnerMmcs: Mmcs<F> + Arbitrary + Debug,
 {
     type ProverData = InnerMmcs::ProverData;
     type Commitment = InnerMmcs::Commitment;
