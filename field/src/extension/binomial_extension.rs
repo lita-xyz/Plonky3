@@ -4,6 +4,7 @@ use core::array;
 use core::fmt::{self, Debug, Display, Formatter};
 use core::iter::{Product, Sum};
 use core::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use proptest_derive::Arbitrary;
 
 use itertools::Itertools;
 use rand::distributions::Standard;
@@ -15,7 +16,7 @@ use crate::extension::BinomiallyExtendable;
 use crate::field::Field;
 use crate::{field_to_array, AbstractExtensionField, AbstractField, ExtensionField, TwoAdicField};
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize, Arbitrary)]
 pub struct BinomialExtensionField<AF, const D: usize> {
     #[serde(
         with = "p3_util::array_serialization",
