@@ -1,4 +1,6 @@
 use core::marker::PhantomData;
+use proptest::prelude::Arbitrary;
+use proptest_derive::Arbitrary;
 
 use crate::hasher::CryptographicHasher;
 use crate::permutation::CryptographicPermutation;
@@ -43,11 +45,11 @@ where
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, Arbitrary)]
 pub struct CompressionFunctionFromHasher<T, H, const N: usize, const CHUNK: usize>
 where
     T: Clone,
-    H: CryptographicHasher<T, [T; CHUNK]>,
+    H: CryptographicHasher<T, [T; CHUNK]> + Arbitrary,
 {
     hasher: H,
     _phantom: PhantomData<T>,
@@ -56,7 +58,7 @@ where
 impl<T, H, const N: usize, const CHUNK: usize> CompressionFunctionFromHasher<T, H, N, CHUNK>
 where
     T: Clone,
-    H: CryptographicHasher<T, [T; CHUNK]>,
+    H: CryptographicHasher<T, [T; CHUNK]> + Arbitrary,
 {
     pub fn new(hasher: H) -> Self {
         Self {
@@ -70,7 +72,7 @@ impl<T, H, const N: usize, const CHUNK: usize> PseudoCompressionFunction<[T; CHU
     for CompressionFunctionFromHasher<T, H, N, CHUNK>
 where
     T: Clone,
-    H: CryptographicHasher<T, [T; CHUNK]>,
+    H: CryptographicHasher<T, [T; CHUNK]> + Arbitrary,
 {
     fn compress(&self, input: [[T; CHUNK]; N]) -> [T; CHUNK] {
         self.hasher.hash_iter(input.into_iter().flatten())
@@ -81,6 +83,6 @@ impl<T, H, const N: usize, const CHUNK: usize> CompressionFunction<[T; CHUNK], N
     for CompressionFunctionFromHasher<T, H, N, CHUNK>
 where
     T: Clone,
-    H: CryptographicHasher<T, [T; CHUNK]>,
+    H: CryptographicHasher<T, [T; CHUNK]> + Arbitrary,
 {
 }
