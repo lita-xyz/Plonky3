@@ -6,6 +6,8 @@ use p3_field::{
     exp_1725656503, exp_u64_by_squaring, AbstractField, Field, PrimeField, PrimeField32,
     PrimeField64, TwoAdicField,
 };
+use proptest::prelude::Arbitrary;
+use proptest_derive::Arbitrary;
 use rand::distributions::{Distribution, Standard};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -34,7 +36,7 @@ const MONTY_MU: u32 = if cfg!(all(target_arch = "aarch64", target_feature = "neo
 const MONTY_MASK: u32 = ((1u64 << MONTY_BITS) - 1) as u32;
 
 /// The prime field `2^31 - 2^27 + 1`, a.k.a. the Baby Bear field.
-#[derive(Copy, Clone, Default, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Default, Eq, Hash, PartialEq, Serialize, Deserialize, Arbitrary)]
 #[repr(transparent)] // `PackedBabyBearNeon` relies on this!
 pub struct BabyBear {
     // This is `pub(crate)` just for tests. If you're accessing `value` outside of those, you're
