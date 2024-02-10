@@ -28,7 +28,7 @@ use crate::verifier::{self, FriError};
 use crate::{prover, FriConfig, FriProof};
 
 /// We group all of our type bounds into this trait to reduce duplication across signatures.
-pub trait TwoAdicFriPcsGenericConfig: Default {
+pub trait TwoAdicFriPcsGenericConfig: Default + Arbitrary + Debug {
     type Val: TwoAdicField;
     type Challenge: TwoAdicField + ExtensionField<Self::Val> + Arbitrary;
     type Challenger: FieldChallenger<Self::Val>
@@ -41,11 +41,13 @@ pub trait TwoAdicFriPcsGenericConfig: Default {
     type FriMmcs: DirectMmcs<Self::Challenge>;
 }
 
+#[derive(Arbitrary, Debug)]
 pub struct TwoAdicFriPcsConfig<Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs>(
     PhantomData<(Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs)>,
 );
 impl<Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs> Default
     for TwoAdicFriPcsConfig<Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs>
+    where Challenger: Debug
 {
     fn default() -> Self {
         Self(PhantomData)
@@ -57,11 +59,11 @@ impl<Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs> TwoAdicFriPcsGenericCo
 where
     Val: TwoAdicField,
     Challenge: TwoAdicField + ExtensionField<Val> + Arbitrary,
-    Challenger: FieldChallenger<Val>
+    Challenger: FieldChallenger<Val> + Debug
         + GrindingChallenger<Witness = Val>
         + CanObserve<<FriMmcs as Mmcs<Challenge>>::Commitment>
         + CanSample<Challenge>,
-    Dft: TwoAdicSubgroupDft<Val>,
+    Dft: TwoAdicSubgroupDft<Val> + Debug,
     InputMmcs: 'static + for<'a> DirectMmcs<Val, Mat<'a> = RowMajorMatrixView<'a, Val>>,
     FriMmcs: DirectMmcs<Challenge>,
 {
