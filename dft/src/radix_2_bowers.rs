@@ -4,7 +4,6 @@ use p3_field::{Field, Powers, TwoAdicField};
 use p3_matrix::dense::{RowMajorMatrix, RowMajorMatrixViewMut};
 use p3_matrix::util::reverse_matrix_index_bits;
 use p3_matrix::Matrix;
-use p3_maybe_rayon::prelude::*;
 use p3_util::{log2_strict_usize, reverse_bits, reverse_slice_index_bits};
 
 use crate::butterflies::{
@@ -138,14 +137,14 @@ fn par_chunks_bowers<F: Field, Fun>(
 ) where
     Fun: Fn(&mut [F], &mut [F], F) + Sync,
 {
-    mat.par_row_chunks_mut(2 * half_block_size)
+    mat.row_chunks_mut(2 * half_block_size)
         .enumerate()
         .for_each(|(block, chunks)| {
             let (hi_chunks, lo_chunks) = chunks.split_at_mut(half_block_size * width);
             let twiddle = twiddles[block];
             hi_chunks
-                .par_chunks_exact_mut(width)
-                .zip(lo_chunks.par_chunks_exact_mut(width))
+                .chunks_exact_mut(width)
+                .zip(lo_chunks.chunks_exact_mut(width))
                 .for_each(|(hi_chunk, lo_chunk)| {
                     if block == 0 {
                         twiddle_free_butterfly_on_rows(hi_chunk, lo_chunk);
