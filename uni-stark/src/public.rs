@@ -2,7 +2,7 @@ use alloc::slice;
 use alloc::vec::Vec;
 use core::iter;
 
-use p3_commit::PcsValidaExt;
+use p3_commit::{Pcs, PcsValidaExt, PolynomialSpace};
 use p3_field::{ExtensionField, TwoAdicField};
 use p3_matrix::dense::RowMajorMatrix;
 use p3_matrix::Matrix;
@@ -29,7 +29,9 @@ where
 
     fn get_ldes<SC>(&self, config: &SC) -> Self
     where
-        SC: StarkGenericConfig<Challenge = E>;
+        SC: StarkGenericConfig<Challenge = E>,
+        <SC::Pcs as Pcs<SC::Challenge, SC::Challenger>>::Domain: PolynomialSpace<Val = F>,
+        <SC as StarkGenericConfig>::Pcs: PcsValidaExt<E, <SC as StarkGenericConfig>::Challenger>;
 }
 
 impl<F, E, T> PublicValues<F, E> for T
@@ -40,7 +42,8 @@ where
 {
     fn get_ldes<SC>(&self, config: &SC) -> Self
     where
-        SC: StarkGenericConfig<Challenge=E>,
+        SC: StarkGenericConfig<Challenge = E>,
+        <SC::Pcs as Pcs<SC::Challenge, SC::Challenger>>::Domain: PolynomialSpace<Val = F>,
         <SC as StarkGenericConfig>::Pcs: PcsValidaExt<E, <SC as StarkGenericConfig>::Challenger>,
     {
         let pcs = config.pcs();
