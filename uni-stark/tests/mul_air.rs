@@ -21,7 +21,7 @@ use p3_poseidon2::{Poseidon2, Poseidon2ExternalMatrixGeneral};
 use p3_symmetric::{
     CompressionFunctionFromHasher, PaddingFreeSponge, SerializingHasher32, TruncatedPermutation,
 };
-use p3_uni_stark::{prove, verify, StarkConfig, StarkGenericConfig, Val};
+use p3_uni_stark::{prove, verify, PublicRow, StarkConfig, StarkGenericConfig, Val};
 use rand::distributions::{Distribution, Standard};
 use rand::{thread_rng, Rng};
 
@@ -129,7 +129,7 @@ where
     let trace = air.random_valid_trace(log_height, true);
 
     let mut p_challenger = challenger.clone();
-    let proof = prove(&config, &air, &mut p_challenger, trace, &vec![]);
+    let proof = prove(&config, &air, &mut p_challenger, trace, &PublicRow::<Val>::default());
 
     let serialized_proof = postcard::to_allocvec(&proof).expect("unable to serialize proof");
     tracing::debug!("serialized_proof len: {} bytes", serialized_proof.len());
@@ -143,7 +143,7 @@ where
         &air,
         &mut v_challenger,
         &deserialized_proof,
-        &vec![],
+        &PublicRow::<Val>::default(),
     )
 }
 

@@ -6,7 +6,9 @@ use core::marker::PhantomData;
 
 use itertools::{izip, Itertools};
 use p3_challenger::{CanObserve, FieldChallenger, GrindingChallenger};
-use p3_commit::{Mmcs, OpenedValues, Pcs, PolynomialSpace, TwoAdicMultiplicativeCoset};
+use p3_commit::{
+    Mmcs, OpenedValues, Pcs, PcsValidaExt, PolynomialSpace, TwoAdicMultiplicativeCoset,
+};
 use p3_dft::TwoAdicSubgroupDft;
 use p3_field::{
     batch_multiplicative_inverse, cyclic_subgroup_coset_known_order, dot_product, ExtensionField,
@@ -33,7 +35,11 @@ pub struct TwoAdicFriPcs<Val, Dft, InputMmcs, FriMmcs> {
     _phantom: PhantomData<Val>,
 }
 
-impl<Val, Dft, InputMmcs, FriMmcs> TwoAdicFriPcs<Val, Dft, InputMmcs, FriMmcs> {
+impl<Val, Dft, InputMmcs, FriMmcs> TwoAdicFriPcs<Val, Dft, InputMmcs, FriMmcs>
+where
+    Val: TwoAdicField,
+    Dft: TwoAdicSubgroupDft<Val>,
+{
     pub const fn new(dft: Dft, mmcs: InputMmcs, fri: FriConfig<FriMmcs>) -> Self {
         Self {
             dft,
@@ -41,6 +47,46 @@ impl<Val, Dft, InputMmcs, FriMmcs> TwoAdicFriPcs<Val, Dft, InputMmcs, FriMmcs> {
             fri,
             _phantom: PhantomData,
         }
+    }
+
+    fn compute_coset_ldes_batches(
+        &self,
+        evaluations: Vec<(TwoAdicMultiplicativeCoset<Val>, RowMajorMatrix<Val>)>,
+    ) -> Vec<RowMajorMatrix<Val>> {
+        evaluations
+            .into_iter()
+            .map(|(domain, evals)| {
+                assert_eq!(domain.size(), evals.height());
+                let shift = Val::generator() / domain.shift;
+                // Commit to the bit-reversed LDE.
+                self.dft
+                    .coset_lde_batch(evals, self.fri.log_blowup, shift)
+                    // Notice that we aren't bit-reversing the rows
+                    .to_row_major_matrix()
+            })
+            .collect()
+    }
+}
+
+impl<Val, Dft, InputMmcs, FriMmcs, Challenge, Challenger> PcsValidaExt<Challenge, Challenger>
+    for TwoAdicFriPcs<Val, Dft, InputMmcs, FriMmcs>
+where
+    Val: TwoAdicField,
+    Dft: TwoAdicSubgroupDft<Val>,
+    InputMmcs: Mmcs<Val>,
+    FriMmcs: Mmcs<Challenge>,
+    Challenge: TwoAdicField + ExtensionField<Val>,
+    Challenger:
+        FieldChallenger<Val> + CanObserve<FriMmcs::Commitment> + GrindingChallenger<Witness = Val>,
+{
+    fn compute_lde_batch(
+        &self,
+        polynomials: RowMajorMatrix<p3_commit::Val<<Self as Pcs<Challenge, Challenger>>::Domain>>,
+    ) -> RowMajorMatrix<Val> {
+        let domain = <TwoAdicFriPcs<Val, Dft, InputMmcs, FriMmcs> as Pcs<Challenge, Challenger>>::natural_domain_for_degree(self, polynomials.height());
+        self.compute_coset_ldes_batches(vec!((domain, polynomials)))
+            .pop()
+            .expect("length of output of compute_coset_ldes_batches should be the same as length of the input")
     }
 }
 
@@ -158,17 +204,10 @@ where
         &self,
         evaluations: Vec<(Self::Domain, RowMajorMatrix<Val>)>,
     ) -> (Self::Commitment, Self::ProverData) {
-        let ldes: Vec<_> = evaluations
+        let ldes = self
+            .compute_coset_ldes_batches(evaluations)
             .into_iter()
-            .map(|(domain, evals)| {
-                assert_eq!(domain.size(), evals.height());
-                let shift = Val::generator() / domain.shift;
-                // Commit to the bit-reversed LDE.
-                self.dft
-                    .coset_lde_batch(evals, self.fri.log_blowup, shift)
-                    .bit_reverse_rows()
-                    .to_row_major_matrix()
-            })
+            .map(|x| x.bit_reverse_rows().to_row_major_matrix())
             .collect();
 
         self.mmcs.commit(ldes)
@@ -257,6 +296,10 @@ where
             .iter()
             .flat_map(|(mats, _)| mats)
             .collect_vec();
+
+        // LITA: conflict to check between:
+        // - https://github.com/lita-xyz/Plonky3/pull/1/files#diff-a8b5740eb9a30586a2b9bc73f81d9ddeacfde0d39a8599fc9ee17dd772c6a08cR264
+        // - https://github.com/Plonky3/Plonky3/pull/286
 
         let global_max_height = mats.iter().map(|m| m.height()).max().unwrap();
         let log_global_max_height = log2_strict_usize(global_max_height);

@@ -6,8 +6,18 @@ use p3_matrix::Matrix;
 
 /// An AIR (algebraic intermediate representation).
 pub trait BaseAir<F>: Sync {
-    /// The number of columns (a.k.a. registers) in this AIR.
+    /// The number of private columns (a.k.a. registers) in this AIR.
     fn width(&self) -> usize;
+
+    /// The number of preprocessed columns in this AIR.
+    fn preprocessed_width(&self) -> usize {
+        0
+    }
+
+    /// The number of public columns in this AIR.
+    fn public_width(&self) -> usize {
+        0
+    }
 
     fn preprocessed_trace(&self) -> Option<RowMajorMatrix<F>> {
         None
@@ -111,9 +121,8 @@ pub trait AirBuilder: Sized {
 }
 
 pub trait AirBuilderWithPublicValues: AirBuilder {
-    type PublicVar: Into<Self::Expr> + Copy;
-
-    fn public_values(&self) -> &[Self::PublicVar];
+    // LITA: public values changed from vector to matrices https://github.com/lita-xyz/Plonky3/pull/1/commits/32eeeae9efaa5583aa6adfa89aca8679686709ee
+    fn public_values(&self) -> Self::M;
 }
 
 pub trait PairBuilder: AirBuilder {
