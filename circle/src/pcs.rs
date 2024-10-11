@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 
 use itertools::{izip, Itertools};
 use p3_challenger::{CanObserve, FieldChallenger, GrindingChallenger};
-use p3_commit::{Mmcs, OpenedValues, Pcs, PolynomialSpace};
+use p3_commit::{Mmcs, OpenedValues, Pcs, PcsValidaExt, PolynomialSpace};
 use p3_field::extension::ComplexExtendable;
 use p3_field::{ExtensionField, Field};
 use p3_fri::verifier::FriError;
@@ -526,6 +526,54 @@ where
                 Ok(fri_input)
             },
         )
+    }
+}
+
+impl<Val, Challenge, Challenger, InputMmcs, FriMmcs> PcsValidaExt<Challenge, Challenger>
+    for CirclePcs<Val, InputMmcs, FriMmcs>
+where
+    Val: ComplexExtendable,
+    Challenge: ExtensionField<Val>,
+    InputMmcs: Mmcs<Val>,
+    FriMmcs: Mmcs<Challenge>,
+    Challenger: FieldChallenger<Val> + GrindingChallenger + CanObserve<FriMmcs::Commitment>,
+{
+    fn domain_extend_evaluations<'a>(
+        &self,
+        evaluations: RowMajorMatrix<p3_commit::Val<Self::Domain>>,
+        evaluation_domain: Self::Domain,
+        extension_domain: Self::Domain,
+    ) -> impl Matrix<Val> + 'a {
+        let evals = CircleEvaluations::from_natural_order(evaluation_domain, evaluations);
+
+        evals.extrapolate(extension_domain).to_cfft_order().as_cow()
+    }
+    fn evaluate_at_points<M>(
+        &self,
+        evaluations: &M,
+        evaluation_domain: Self::Domain,
+        points: &[Challenge],
+    ) -> Vec<Vec<Challenge>>
+    where
+        M: Matrix<Val> + Clone,
+    {
+        let evals = CircleEvaluations::from_natural_order(evaluation_domain, evaluations.clone());
+
+        points
+            .iter()
+            .map(|&zeta| {
+                let zeta = Point::from_projective_line(zeta);
+
+                // Staying in evaluation form, we lagrange interpolate to get the value of
+                // each p at zeta.
+                // todo: we only need half of the values to interpolate, but how?
+                let ps_at_zeta: Vec<Challenge> =
+                    info_span!("compute opened values with Lagrange interpolation")
+                        .in_scope(|| evals.evaluate_at_point(zeta));
+
+                ps_at_zeta
+            })
+            .collect()
     }
 }
 

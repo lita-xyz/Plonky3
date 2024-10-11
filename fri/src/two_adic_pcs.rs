@@ -6,7 +6,9 @@ use core::marker::PhantomData;
 
 use itertools::{izip, Itertools};
 use p3_challenger::{CanObserve, FieldChallenger, GrindingChallenger};
-use p3_commit::{Mmcs, OpenedValues, Pcs, PolynomialSpace, TwoAdicMultiplicativeCoset};
+use p3_commit::{
+    Mmcs, OpenedValues, Pcs, PcsValidaExt, PolynomialSpace, TwoAdicMultiplicativeCoset,
+};
 use p3_dft::TwoAdicSubgroupDft;
 use p3_field::{
     batch_multiplicative_inverse, cyclic_subgroup_coset_known_order, dot_product, ExtensionField,
@@ -33,7 +35,11 @@ pub struct TwoAdicFriPcs<Val, Dft, InputMmcs, FriMmcs> {
     _phantom: PhantomData<Val>,
 }
 
-impl<Val, Dft, InputMmcs, FriMmcs> TwoAdicFriPcs<Val, Dft, InputMmcs, FriMmcs> {
+impl<Val, Dft, InputMmcs, FriMmcs> TwoAdicFriPcs<Val, Dft, InputMmcs, FriMmcs>
+where
+    Val: TwoAdicField,
+    Dft: TwoAdicSubgroupDft<Val>,
+{
     pub const fn new(dft: Dft, mmcs: InputMmcs, fri: FriConfig<FriMmcs>) -> Self {
         Self {
             dft,
@@ -41,6 +47,72 @@ impl<Val, Dft, InputMmcs, FriMmcs> TwoAdicFriPcs<Val, Dft, InputMmcs, FriMmcs> {
             fri,
             _phantom: PhantomData,
         }
+    }
+
+    fn compute_coset_ldes_batches(
+        &self,
+        evaluations: Vec<(TwoAdicMultiplicativeCoset<Val>, RowMajorMatrix<Val>)>,
+        extension_domains: Vec<TwoAdicMultiplicativeCoset<Val>>,
+    ) -> Vec<RowMajorMatrix<Val>> {
+        debug_assert_eq!(evaluations.len(), extension_domains.len());
+        evaluations
+            .into_iter()
+            .zip(extension_domains)
+            .map(|((domain, evals), extension_domain)| {
+                assert_eq!(domain.size(), evals.height());
+                let shift = extension_domain.shift / domain.shift;
+                assert!(extension_domain.log_n >= domain.log_n);
+                self.dft
+                    .coset_lde_batch(evals, extension_domain.log_n - domain.log_n, shift)
+                    .to_row_major_matrix()
+            })
+            .collect()
+    }
+}
+
+impl<Val, Dft, InputMmcs, FriMmcs, Challenge, Challenger> PcsValidaExt<Challenge, Challenger>
+    for TwoAdicFriPcs<Val, Dft, InputMmcs, FriMmcs>
+where
+    Val: TwoAdicField,
+    Dft: TwoAdicSubgroupDft<Val>,
+    InputMmcs: Mmcs<Val>,
+    FriMmcs: Mmcs<Challenge>,
+    Challenge: TwoAdicField + ExtensionField<Val>,
+    Challenger:
+        FieldChallenger<Val> + CanObserve<FriMmcs::Commitment> + GrindingChallenger<Witness = Val>,
+{
+    fn domain_extend_evaluations<'a>(
+        &self,
+        evaluations: RowMajorMatrix<Val>,
+        evaluation_domain: Self::Domain,
+        extension_domain: Self::Domain,
+    ) -> impl Matrix<Val> + 'a {
+        let [lde] = self
+            .compute_coset_ldes_batches(
+                vec![(evaluation_domain, evaluations)],
+                vec![extension_domain],
+            )
+            .try_into()
+            .unwrap();
+        lde
+    }
+    fn evaluate_at_points<M: Matrix<Val>>(
+        &self,
+        evaluations: &M,
+        evaluation_domain: Self::Domain,
+        points: &[Challenge],
+    ) -> Vec<Vec<Challenge>> {
+        points
+            .iter()
+            .map(|point| {
+                p3_interpolation::interpolate_coset::<Val, Challenge, _>(
+                    evaluations,
+                    evaluation_domain.shift,
+                    *point,
+                    None
+                )
+            })
+            .collect()
     }
 }
 
@@ -159,17 +231,17 @@ where
         &self,
         evaluations: Vec<(Self::Domain, RowMajorMatrix<Val>)>,
     ) -> (Self::Commitment, Self::ProverData) {
-        let ldes: Vec<_> = evaluations
-            .into_iter()
-            .map(|(domain, evals)| {
-                assert_eq!(domain.size(), evals.height());
-                let shift = Val::GENERATOR / domain.shift;
-                // Commit to the bit-reversed LDE.
-                self.dft
-                    .coset_lde_batch(evals, self.fri.log_blowup, shift)
-                    .bit_reverse_rows()
-                    .to_row_major_matrix()
+        let extension_domains = evaluations
+            .iter()
+            .map(|(d, _)| TwoAdicMultiplicativeCoset {
+                log_n: d.log_n + self.fri.log_blowup,
+                shift: Val::GENERATOR,
             })
+            .collect_vec();
+        let ldes = self
+            .compute_coset_ldes_batches(evaluations, extension_domains)
+            .into_iter()
+            .map(|x| x.bit_reverse_rows().to_row_major_matrix())
             .collect();
 
         self.mmcs.commit(ldes)

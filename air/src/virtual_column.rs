@@ -15,14 +15,16 @@ pub struct VirtualPairCol<F: Field> {
 #[derive(Clone, Copy, Debug)]
 pub enum PairCol {
     Preprocessed(usize),
+    Public(usize),
     Main(usize),
 }
 
 impl PairCol {
-    pub const fn get<T: Copy>(&self, preprocessed: &[T], main: &[T]) -> T {
+    pub const fn get<T: Copy>(&self, preprocessed: &[T], public: &[T], main: &[T]) -> T {
         match self {
             PairCol::Preprocessed(i) => preprocessed[*i],
             PairCol::Main(i) => main[*i],
+            PairCol::Public(i) => public[*i],
         }
     }
 }
@@ -50,6 +52,16 @@ impl<F: Field> VirtualPairCol<F> {
             column_weights
                 .into_iter()
                 .map(|(i, w)| (PairCol::Main(i), w))
+                .collect(),
+            constant,
+        )
+    }
+
+    pub fn new_public(column_weights: Vec<(usize, F)>, constant: F) -> Self {
+        Self::new(
+            column_weights
+                .into_iter()
+                .map(|(i, w)| (PairCol::Public(i), w))
                 .collect(),
             constant,
         )
@@ -84,6 +96,11 @@ impl<F: Field> VirtualPairCol<F> {
     }
 
     #[must_use]
+    pub fn single_public(column: usize) -> Self {
+        Self::single(PairCol::Public(column))
+    }
+
+    #[must_use]
     pub fn sum_main(columns: Vec<usize>) -> Self {
         let column_weights = columns.into_iter().map(|col| (col, F::ONE)).collect();
         Self::new_main(column_weights, F::ZERO)
@@ -93,6 +110,12 @@ impl<F: Field> VirtualPairCol<F> {
     pub fn sum_preprocessed(columns: Vec<usize>) -> Self {
         let column_weights = columns.into_iter().map(|col| (col, F::ONE)).collect();
         Self::new_preprocessed(column_weights, F::ZERO)
+    }
+
+    #[must_use]
+    pub fn sum_public(columns: Vec<usize>) -> Self {
+        let column_weights = columns.into_iter().map(|col| (col, F::ONE)).collect();
+        Self::new_public(column_weights, F::ZERO)
     }
 
     /// `a - b`, where `a` and `b` are columns in the preprocessed trace.
@@ -107,7 +130,13 @@ impl<F: Field> VirtualPairCol<F> {
         Self::new_main(vec![(a_col, F::ONE), (b_col, F::NEG_ONE)], F::ZERO)
     }
 
-    pub fn apply<Expr, Var>(&self, preprocessed: &[Var], main: &[Var]) -> Expr
+    /// `a - b`, where `a` and `b` are columns in the main trace.
+    #[must_use]
+    pub fn diff_public(a_col: usize, b_col: usize) -> Self {
+        Self::new_public(vec![(a_col, F::ONE), (b_col, F::NEG_ONE)], F::ZERO)
+    }
+
+    pub fn apply<Expr, Var>(&self, preprocessed: &[Var], public: &[Var], main: &[Var]) -> Expr
     where
         F: Into<Expr>,
         Expr: FieldAlgebra + Mul<F, Output = Expr>,
@@ -115,7 +144,7 @@ impl<F: Field> VirtualPairCol<F> {
     {
         let mut result = self.constant.into();
         for (column, weight) in self.column_weights.iter() {
-            result += column.get(preprocessed, main).into() * *weight;
+            result += column.get(preprocessed, public, main).into() * *weight;
         }
         result
     }

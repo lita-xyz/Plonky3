@@ -10,7 +10,7 @@ use p3_fri::{create_benchmark_fri_config, TwoAdicFriPcs};
 use p3_keccak::{Keccak256Hash, KeccakF};
 use p3_mersenne_31::Mersenne31;
 use p3_symmetric::{CryptographicPermutation, PaddingFreeSponge, SerializingHasher32To64};
-use p3_uni_stark::{prove, verify, StarkConfig};
+use p3_uni_stark::{prove, verify, PublicRow, StarkConfig};
 use rand::distributions::Standard;
 use rand::prelude::Distribution;
 
@@ -86,8 +86,8 @@ where
     let mut proof_challenger = SerializingChallenger32::from_hasher(vec![], Keccak256Hash {});
     let mut verif_challenger = SerializingChallenger32::from_hasher(vec![], Keccak256Hash {});
 
-    let proof = prove(&config, &proof_goal, &mut proof_challenger, trace, &vec![]);
-    verify(&config, &proof_goal, &mut verif_challenger, &proof, &vec![])
+    let proof = prove(&config, &proof_goal, &mut proof_challenger, trace, PublicRow::default());
+    verify(&config, &proof_goal, &mut verif_challenger, &proof, &PublicRow::default())
 }
 
 /// Prove the given ProofGoal using the Poseidon2 hash function to build the merkle tree.
@@ -128,8 +128,8 @@ where
     let mut proof_challenger = DuplexChallenger::new(perm24.clone());
     let mut verif_challenger = DuplexChallenger::new(perm24.clone());
 
-    let proof = prove(&config, &proof_goal, &mut proof_challenger, trace, &vec![]);
-    verify(&config, &proof_goal, &mut verif_challenger, &proof, &vec![])
+    let proof = prove(&config, &proof_goal, &mut proof_challenger, trace, PublicRow::default());
+    verify(&config, &proof_goal, &mut verif_challenger, &proof, &PublicRow::default())
 }
 
 /// Prove the given ProofGoal using the Keccak hash function to build the merkle tree.
@@ -164,8 +164,8 @@ pub fn prove_m31_keccak<
     let mut proof_challenger = SerializingChallenger32::from_hasher(vec![], Keccak256Hash {});
     let mut verif_challenger = SerializingChallenger32::from_hasher(vec![], Keccak256Hash {});
 
-    let proof = prove(&config, &proof_goal, &mut proof_challenger, trace, &vec![]);
-    verify(&config, &proof_goal, &mut verif_challenger, &proof, &vec![])
+    let proof = prove(&config, &proof_goal, &mut proof_challenger, trace, PublicRow::default());
+    verify(&config, &proof_goal, &mut verif_challenger, &proof, &PublicRow::default())
 }
 
 /// Prove the given ProofGoal using the Keccak hash function to build the merkle tree.
@@ -204,8 +204,8 @@ where
     let mut proof_challenger = DuplexChallenger::new(perm24.clone());
     let mut verif_challenger = DuplexChallenger::new(perm24.clone());
 
-    let proof = prove(&config, &proof_goal, &mut proof_challenger, trace, &vec![]);
-    verify(&config, &proof_goal, &mut verif_challenger, &proof, &vec![])
+    let proof = prove(&config, &proof_goal, &mut proof_challenger, trace, PublicRow::default());
+    verify(&config, &proof_goal, &mut verif_challenger, &proof, &PublicRow::default())
 }
 
 /// Report the result of the proof.

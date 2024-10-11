@@ -10,7 +10,7 @@ use p3_matrix::Matrix;
 use p3_util::log2_strict_usize;
 use serde::{Deserialize, Serialize};
 
-use crate::{OpenedValues, Pcs, PolynomialSpace, TwoAdicMultiplicativeCoset};
+use crate::{OpenedValues, Pcs, PcsValidaExt, PolynomialSpace, TwoAdicMultiplicativeCoset};
 
 /// A trivial PCS: its commitment is simply the coefficients of each poly.
 #[derive(Debug)]
@@ -173,5 +173,63 @@ where
             }
         }
         Ok(())
+    }
+}
+
+impl<Val, Dft, Challenge, Challenger> PcsValidaExt<Challenge, Challenger> for TrivialPcs<Val, Dft>
+where
+    Val: TwoAdicField,
+    Dft: TwoAdicSubgroupDft<Val>,
+    Challenge: ExtensionField<Val>,
+    Challenger: CanSample<Challenge>,
+{
+    fn domain_extend_evaluations<'a>(
+        &self,
+        evaluations: RowMajorMatrix<Val>,
+        evaluation_domain: Self::Domain,
+        extension_domain: Self::Domain,
+    ) -> impl Matrix<Val> + 'a {
+        assert!(evaluations.height() == evaluation_domain.size());
+        let mut coeffs = self.dft.idft_batch(evaluations);
+        coeffs
+            .rows_mut()
+            .zip(evaluation_domain.shift.inverse().powers())
+            .for_each(|(row, weight)| {
+                row.iter_mut().for_each(|coeff| {
+                    *coeff *= weight;
+                })
+            });
+        assert!(extension_domain.log_n >= evaluation_domain.log_n);
+        coeffs.values.resize(
+            coeffs.values.len() << (extension_domain.log_n - evaluation_domain.log_n),
+            Val::ZERO,
+        );
+        self.dft.coset_dft_batch(coeffs, extension_domain.shift)
+    }
+
+    fn evaluate_at_points<M>(
+        &self,
+        evaluations: &M,
+        evaluation_domain: Self::Domain,
+        points: &[Challenge],
+    ) -> Vec<Vec<Challenge>>
+    where
+        M: Matrix<crate::Val<Self::Domain>> + Clone,
+    {
+        let mut coeffs = self
+            .dft
+            .idft_batch(evaluations.clone().to_row_major_matrix());
+        coeffs
+            .rows_mut()
+            .zip(evaluation_domain.shift.inverse().powers())
+            .for_each(|(row, weight)| {
+                row.iter_mut().for_each(|coeff| {
+                    *coeff *= weight;
+                })
+            });
+        points
+            .iter()
+            .map(|pt| eval_coeffs_at_pt(&coeffs, *pt))
+            .collect()
     }
 }

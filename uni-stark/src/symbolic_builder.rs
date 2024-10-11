@@ -68,7 +68,7 @@ where
 pub struct SymbolicAirBuilder<F: Field> {
     preprocessed: RowMajorMatrix<SymbolicVariable<F>>,
     main: RowMajorMatrix<SymbolicVariable<F>>,
-    public_values: Vec<SymbolicVariable<F>>,
+    public_values: RowMajorMatrix<SymbolicVariable<F>>,
     constraints: Vec<SymbolicExpression<F>>,
 }
 
@@ -87,13 +87,17 @@ impl<F: Field> SymbolicAirBuilder<F> {
                 (0..width).map(move |index| SymbolicVariable::new(Entry::Main { offset }, index))
             })
             .collect();
-        let public_values = (0..num_public_values)
-            .map(move |index| SymbolicVariable::new(Entry::Public, index))
+        let public_values = [0, 1]
+            .into_iter()
+            .flat_map(|offset| {
+                (0..num_public_values)
+                    .map(move |index| SymbolicVariable::new(Entry::Main { offset }, index))
+            })
             .collect();
         Self {
             preprocessed: RowMajorMatrix::new(prep_values, preprocessed_width),
             main: RowMajorMatrix::new(main_values, width),
-            public_values,
+            public_values: RowMajorMatrix::new(public_values, num_public_values.max(1)),
             constraints: vec![],
         }
     }
@@ -135,9 +139,8 @@ impl<F: Field> AirBuilder for SymbolicAirBuilder<F> {
 }
 
 impl<F: Field> AirBuilderWithPublicValues for SymbolicAirBuilder<F> {
-    type PublicVar = SymbolicVariable<F>;
-    fn public_values(&self) -> &[Self::PublicVar] {
-        &self.public_values
+    fn public_values(&self) -> Self::M {
+        self.public_values.clone()
     }
 }
 

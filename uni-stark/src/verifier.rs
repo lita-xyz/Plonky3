@@ -1,9 +1,9 @@
 use alloc::vec;
-use alloc::vec::Vec;
 
 use itertools::Itertools;
 use p3_air::{Air, BaseAir};
 use p3_challenger::{CanObserve, CanSample, FieldChallenger};
+use p3_commit::PcsValidaExt; // LITA
 use p3_commit::{Pcs, PolynomialSpace};
 use p3_field::{Field, FieldAlgebra, FieldExtensionAlgebra};
 use p3_matrix::dense::RowMajorMatrixView;
@@ -11,19 +11,21 @@ use p3_matrix::stack::VerticalPair;
 use tracing::instrument;
 
 use crate::symbolic_builder::{get_log_quotient_degree, SymbolicAirBuilder};
-use crate::{PcsError, Proof, StarkGenericConfig, Val, VerifierConstraintFolder};
+use crate::{PcsError, Proof, PublicValues, StarkGenericConfig, Val, VerifierConstraintFolder};
 
 #[instrument(skip_all)]
-pub fn verify<SC, A>(
+pub fn verify<SC, A, P>(
     config: &SC,
     air: &A,
     challenger: &mut SC::Challenger,
     proof: &Proof<SC>,
-    public_values: &Vec<Val<SC>>,
+    public_values: &P,
 ) -> Result<(), VerificationError<PcsError<SC>>>
 where
     SC: StarkGenericConfig,
     A: Air<SymbolicAirBuilder<Val<SC>>> + for<'a> Air<VerifierConstraintFolder<'a, SC>>,
+    P: PublicValues<Val<SC>, SC::Challenge>,
+    <SC as StarkGenericConfig>::Pcs: PcsValidaExt<SC::Challenge, SC::Challenger>,
 {
     let Proof {
         commitments,
@@ -33,7 +35,7 @@ where
     } = proof;
 
     let degree = 1 << degree_bits;
-    let log_quotient_degree = get_log_quotient_degree::<Val<SC>, A>(air, 0, public_values.len());
+    let log_quotient_degree = get_log_quotient_degree::<Val<SC>, A>(air, 0, public_values.width());
     let quotient_degree = 1 << log_quotient_degree;
 
     let pcs = config.pcs();
@@ -63,7 +65,9 @@ where
     // collision, since most such changes would completely change the set of satisfying witnesses.
 
     challenger.observe(commitments.trace.clone());
-    challenger.observe_slice(public_values);
+    for i in 0..public_values.height() {
+        challenger.observe_slice(&public_values.row_slice(i));
+    }
     let alpha: SC::Challenge = challenger.sample_ext_element();
     challenger.observe(commitments.quotient_chunks.clone());
 
@@ -106,7 +110,9 @@ where
                 .filter(|(j, _)| *j != i)
                 .map(|(_, other_domain)| {
                     other_domain.zp_at_point(zeta)
-                        * other_domain.zp_at_point(domain.first_point()).inverse()
+                        * <Val<SC> as Into<SC::Challenge>>::into(
+                            other_domain.zp_at_point(domain.first_point()).inverse(),
+                        )
                 })
                 .product::<SC::Challenge>()
         })
@@ -132,9 +138,19 @@ where
         RowMajorMatrixView::new_row(&opened_values.trace_next),
     );
 
+    let [public_local, public_next] = public_values
+        .interpolate(pcs, &[zeta, zeta_next], trace_domain)
+        .try_into()
+        .unwrap();
+
+    let public = VerticalPair::new(
+        RowMajorMatrixView::new_row(&public_local),
+        RowMajorMatrixView::new_row(&public_next),
+    );
+
     let mut folder = VerifierConstraintFolder {
         main,
-        public_values,
+        public_values: public,
         is_first_row: sels.is_first_row,
         is_last_row: sels.is_last_row,
         is_transition: sels.is_transition,
@@ -143,7 +159,6 @@ where
     };
     air.eval(&mut folder);
     let folded_constraints = folder.accumulator;
-
     // Finally, check that
     //     folded_constraints(zeta) / Z_H(zeta) = quotient(zeta)
     if folded_constraints * sels.inv_zeroifier != quotient {

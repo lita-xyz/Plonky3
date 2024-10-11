@@ -1,5 +1,3 @@
-use alloc::vec::Vec;
-
 use p3_air::{Air, AirBuilder, AirBuilderWithPublicValues};
 use p3_field::Field;
 use p3_matrix::dense::{RowMajorMatrix, RowMajorMatrixView};
@@ -8,10 +6,11 @@ use p3_matrix::Matrix;
 use tracing::instrument;
 
 #[instrument(name = "check constraints", skip_all)]
-pub(crate) fn check_constraints<F, A>(air: &A, main: &RowMajorMatrix<F>, public_values: &Vec<F>)
+pub(crate) fn check_constraints<F, A, P>(air: &A, main: &RowMajorMatrix<F>, public_values: &P)
 where
     F: Field,
     A: for<'a> Air<DebugConstraintBuilder<'a, F>>,
+    P: Matrix<F>,
 {
     let height = main.height();
 
@@ -23,6 +22,13 @@ where
         let main = VerticalPair::new(
             RowMajorMatrixView::new_row(&*local),
             RowMajorMatrixView::new_row(&*next),
+        );
+
+        let public_local = public_values.row_slice(i);
+        let public_next = public_values.row_slice(i_next);
+        let public_values = VerticalPair::new(
+            RowMajorMatrixView::new_row(&*public_local),
+            RowMajorMatrixView::new_row(&*public_next),
         );
 
         let mut builder = DebugConstraintBuilder {
@@ -44,7 +50,7 @@ where
 pub struct DebugConstraintBuilder<'a, F: Field> {
     row_index: usize,
     main: VerticalPair<RowMajorMatrixView<'a, F>, RowMajorMatrixView<'a, F>>,
-    public_values: &'a [F],
+    public_values: VerticalPair<RowMajorMatrixView<'a, F>, RowMajorMatrixView<'a, F>>,
     is_first_row: F,
     is_last_row: F,
     is_transition: F,
@@ -100,9 +106,7 @@ where
 }
 
 impl<F: Field> AirBuilderWithPublicValues for DebugConstraintBuilder<'_, F> {
-    type PublicVar = Self::F;
-
-    fn public_values(&self) -> &[Self::F] {
+    fn public_values(&self) -> Self::M {
         self.public_values
     }
 }

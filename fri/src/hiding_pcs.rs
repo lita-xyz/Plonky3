@@ -27,7 +27,7 @@ pub struct HidingFriPcs<Val, Dft, InputMmcs, FriMmcs, R> {
     rng: RefCell<R>,
 }
 
-impl<Val, Dft, InputMmcs, FriMmcs, R> HidingFriPcs<Val, Dft, InputMmcs, FriMmcs, R> {
+impl<Val: TwoAdicField, Dft: TwoAdicSubgroupDft<Val>, InputMmcs, FriMmcs, R> HidingFriPcs<Val, Dft, InputMmcs, FriMmcs, R> {
     pub fn new(
         dft: Dft,
         mmcs: InputMmcs,
