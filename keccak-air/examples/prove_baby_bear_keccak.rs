@@ -8,7 +8,6 @@ use p3_fri::{FriConfig, TwoAdicFriPcs};
 use p3_keccak::Keccak256Hash;
 use p3_keccak_air::{generate_trace_rows, KeccakAir};
 use p3_matrix::Matrix;
-use p3_matrix::dense::RowMajorMatrix;
 use p3_merkle_tree::MerkleTreeMmcs;
 use p3_monty_31::dft::RecursiveDft;
 use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher32};
@@ -70,8 +69,20 @@ fn main() -> Result<(), impl Debug> {
     let config = MyConfig::new(pcs);
 
     let mut challenger = Challenger::from_hasher(vec![], byte_hash);
-    let proof = prove(&config, &KeccakAir {}, &mut challenger, trace, &PublicRow::<Val>::default());
+    let proof = prove(
+        &config,
+        &KeccakAir {},
+        &mut challenger,
+        trace,
+        PublicRow::<Val>::default(),
+    );
 
     let mut challenger = Challenger::from_hasher(vec![], byte_hash);
-    verify(&config, &KeccakAir {}, &mut challenger, &proof, &RowMajorMatrix::new(vec![], 0))
+    verify(
+        &config,
+        &KeccakAir {},
+        &mut challenger,
+        &proof,
+        &PublicRow::default(),
+    )
 }

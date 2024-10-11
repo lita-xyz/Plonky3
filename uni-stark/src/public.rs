@@ -3,52 +3,39 @@ use alloc::vec::Vec;
 use core::iter;
 
 use p3_commit::{Pcs, PcsValidaExt, PolynomialSpace};
-use p3_field::{ExtensionField, TwoAdicField};
+use p3_field::{ExtensionField, Field, TwoAdicField};
 use p3_matrix::dense::RowMajorMatrix;
 use p3_matrix::Matrix;
-use p3_util::log2_strict_usize;
-
-use crate::StarkGenericConfig;
-
-pub trait PublicValues<F, E>: Matrix<F> + Sized
+pub trait PublicValues<F, E>: Matrix<F> + Sized + Clone
 where
-    F: TwoAdicField,
-    E: ExtensionField<F> + TwoAdicField,
+    F: Field,
+    E: ExtensionField<F> + Field,
 {
-    fn interpolate(&self, zeta: E, offset: usize) -> Vec<E>
+    fn interpolate<P, Challenger>(
+        &self,
+        pcs: &P,
+        points: &[E],
+        evaluation_domain: P::Domain,
+    ) -> Vec<Vec<E>>
     where
-        Self: core::marker::Sized,
+        P: PcsValidaExt<E, Challenger>,
+        P::Domain: PolynomialSpace<Val = F>,
     {
-        let height = self.height();
-        let log_height = log2_strict_usize(height);
-        let g = F::two_adic_generator(log_height);
-        let shift = g.powers().nth(offset).unwrap();
-
-        p3_interpolation::interpolate_coset::<F, E, _>(self, shift, zeta)
+        pcs.evaluate_at_points(self, evaluation_domain, points)
     }
 
-    fn get_ldes<SC>(&self, config: &SC) -> Self
+    fn get_evaluations_on_domain<'a, P, Challenger>(
+        self,
+        pcs: &P,
+        evaluation_domain: P::Domain,
+        extension_domain: P::Domain,
+    ) -> impl Matrix<F> + 'a
     where
-        SC: StarkGenericConfig<Challenge = E>,
-        <SC::Pcs as Pcs<SC::Challenge, SC::Challenger>>::Domain: PolynomialSpace<Val = F>,
-        <SC as StarkGenericConfig>::Pcs: PcsValidaExt<E, <SC as StarkGenericConfig>::Challenger>;
-}
-
-impl<F, E, T> PublicValues<F, E> for T
-where
-    F: TwoAdicField,
-    E: ExtensionField<F> + TwoAdicField,
-    T: From<RowMajorMatrix<F>> + Matrix<F> + Sized + Clone,
-{
-    fn get_ldes<SC>(&self, config: &SC) -> Self
-    where
-        SC: StarkGenericConfig<Challenge = E>,
-        <SC::Pcs as Pcs<SC::Challenge, SC::Challenger>>::Domain: PolynomialSpace<Val = F>,
-        <SC as StarkGenericConfig>::Pcs: PcsValidaExt<E, <SC as StarkGenericConfig>::Challenger>,
+        P: PcsValidaExt<E, Challenger>,
+        P::Domain: PolynomialSpace<Val = F>,
     {
-        let pcs = config.pcs();
-        let mat = self.clone().to_row_major_matrix();
-        pcs.compute_lde_batch(mat).into()
+        let mat = self.to_row_major_matrix();
+        pcs.domain_extend_evaluations(mat, evaluation_domain, extension_domain)
     }
 }
 
@@ -78,23 +65,40 @@ impl<T: Clone + Send + Sync> Matrix<T> for PublicRow<T> {
 
     #[inline]
     fn row(&self, _r: usize) -> Self::Row<'_> {
-        assert_eq!(_r, 1);
         self.0.iter().cloned()
     }
 }
 
 impl<F, E> PublicValues<F, E> for PublicRow<F>
 where
-    F: TwoAdicField,
-    E: ExtensionField<F> + TwoAdicField,
+    F: Field,
+    E: ExtensionField<F>,
 {
-    fn interpolate(&self, _zeta: E, _offset: usize) -> Vec<E> {
-        self.0.iter().map(|v| E::from_base(*v)).collect()
+    fn interpolate<P, Challenger>(
+        &self,
+        _pcs: &P,
+        points: &[E],
+        _evaluation_domain: P::Domain,
+    ) -> Vec<Vec<E>>
+    where
+        P: PcsValidaExt<E, Challenger>,
+        P::Domain: PolynomialSpace<Val = F>,
+    {
+        points
+            .iter()
+            .map(|_zeta| self.0.iter().map(|v| E::from_base(*v)).collect())
+            .collect()
     }
 
-    fn get_ldes<SC>(&self, _config: &SC) -> Self
+    fn get_evaluations_on_domain<'a, P, Challenger>(
+        self,
+        _pcs: &P,
+        _evaluation_domain: P::Domain,
+        _extension_domain: P::Domain,
+    ) -> impl Matrix<F> + 'a
     where
-        SC: StarkGenericConfig,
+        P: PcsValidaExt<E, Challenger>,
+        P::Domain: PolynomialSpace<Val = F>,
     {
         self.clone()
     }

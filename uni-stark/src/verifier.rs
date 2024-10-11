@@ -11,7 +11,6 @@ use tracing::instrument;
 
 // LITA
 use p3_commit::PcsValidaExt;
-use p3_field::TwoAdicField;
 
 use crate::symbolic_builder::{get_log_quotient_degree, SymbolicAirBuilder};
 use crate::{PcsError, Proof, PublicValues, StarkGenericConfig, Val, VerifierConstraintFolder};
@@ -28,9 +27,6 @@ where
     SC: StarkGenericConfig,
     A: Air<SymbolicAirBuilder<Val<SC>>> + for<'a> Air<VerifierConstraintFolder<'a, SC>>,
     P: PublicValues<Val<SC>, SC::Challenge>,
-    // LITA: TODO - clean up this. Also incompatible with circle starks
-    <SC as StarkGenericConfig>::Challenge: TwoAdicField,
-    <<<SC as StarkGenericConfig>::Pcs as Pcs<SC::Challenge, SC::Challenger>>::Domain as PolynomialSpace>::Val: TwoAdicField,
     <SC as StarkGenericConfig>::Pcs: PcsValidaExt<SC::Challenge, SC::Challenger>,
 {
     let Proof {
@@ -116,7 +112,9 @@ where
                 .filter(|(j, _)| *j != i)
                 .map(|(_, other_domain)| {
                     other_domain.zp_at_point(zeta)
-                        * other_domain.zp_at_point(domain.first_point()).inverse().into()
+                        * <Val<SC> as Into<SC::Challenge>>::into(
+                            other_domain.zp_at_point(domain.first_point()).inverse(),
+                        )
                 })
                 .product::<SC::Challenge>()
         })
@@ -141,10 +139,12 @@ where
         RowMajorMatrixView::new_row(&opened_values.trace_next),
     );
 
-    let (public_local, public_next) = (
-        public_values.interpolate(zeta, 0),
-        public_values.interpolate(zeta, 1),
-    );
+    let [public_local, public_next] = public_values
+        .interpolate(pcs, &[zeta, zeta_next], trace_domain)
+        .try_into()
+        .unwrap();
+    println!("public_local: {:?}", public_local);
+    println!("public_next: {:?}", public_next);
 
     let public = VerticalPair::new(
         RowMajorMatrixView::new_row(&public_local),
@@ -162,7 +162,13 @@ where
     };
     air.eval(&mut folder);
     let folded_constraints = folder.accumulator;
+    println!("folded_constraints: {:?}", folded_constraints);
+    println!("sels.inv_zeroifier: {:?}", sels.inv_zeroifier);
+    println!("quotient: {:?}", quotient);
 
+    println!("folded_constraints: {:?}", folded_constraints);
+    println!("quotient: {:?}", quotient);
+    println!("sels.inv_zeroifier: {:?}", sels.inv_zeroifier);
     // Finally, check that
     //     folded_constraints(zeta) / Z_H(zeta) = quotient(zeta)
     if folded_constraints * sels.inv_zeroifier != quotient {

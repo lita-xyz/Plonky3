@@ -52,16 +52,18 @@ where
     fn compute_coset_ldes_batches(
         &self,
         evaluations: Vec<(TwoAdicMultiplicativeCoset<Val>, RowMajorMatrix<Val>)>,
+        extension_domains: Vec<TwoAdicMultiplicativeCoset<Val>>,
     ) -> Vec<RowMajorMatrix<Val>> {
+        debug_assert_eq!(evaluations.len(), extension_domains.len());
         evaluations
             .into_iter()
-            .map(|(domain, evals)| {
+            .zip(extension_domains)
+            .map(|((domain, evals), extension_domain)| {
                 assert_eq!(domain.size(), evals.height());
-                let shift = Val::generator() / domain.shift;
-                // Commit to the bit-reversed LDE.
+                let shift = extension_domain.shift / domain.shift;
+                assert!(extension_domain.log_n >= domain.log_n);
                 self.dft
-                    .coset_lde_batch(evals, self.fri.log_blowup, shift)
-                    // Notice that we aren't bit-reversing the rows
+                    .coset_lde_batch(evals, extension_domain.log_n - domain.log_n, shift)
                     .to_row_major_matrix()
             })
             .collect()
@@ -79,14 +81,37 @@ where
     Challenger:
         FieldChallenger<Val> + CanObserve<FriMmcs::Commitment> + GrindingChallenger<Witness = Val>,
 {
-    fn compute_lde_batch(
+    fn domain_extend_evaluations<'a>(
         &self,
-        polynomials: RowMajorMatrix<p3_commit::Val<<Self as Pcs<Challenge, Challenger>>::Domain>>,
-    ) -> RowMajorMatrix<Val> {
-        let domain = <TwoAdicFriPcs<Val, Dft, InputMmcs, FriMmcs> as Pcs<Challenge, Challenger>>::natural_domain_for_degree(self, polynomials.height());
-        self.compute_coset_ldes_batches(vec!((domain, polynomials)))
-            .pop()
-            .expect("length of output of compute_coset_ldes_batches should be the same as length of the input")
+        evaluations: RowMajorMatrix<Val>,
+        evaluation_domain: Self::Domain,
+        extension_domain: Self::Domain,
+    ) -> impl Matrix<Val> + 'a {
+        let [lde] = self
+            .compute_coset_ldes_batches(
+                vec![(evaluation_domain, evaluations)],
+                vec![extension_domain],
+            )
+            .try_into()
+            .unwrap();
+        lde
+    }
+    fn evaluate_at_points<M: Matrix<Val>>(
+        &self,
+        evaluations: &M,
+        evaluation_domain: Self::Domain,
+        points: &[Challenge],
+    ) -> Vec<Vec<Challenge>> {
+        points
+            .iter()
+            .map(|point| {
+                p3_interpolation::interpolate_coset::<Val, Challenge, _>(
+                    evaluations,
+                    evaluation_domain.shift,
+                    *point,
+                )
+            })
+            .collect()
     }
 }
 
@@ -204,8 +229,15 @@ where
         &self,
         evaluations: Vec<(Self::Domain, RowMajorMatrix<Val>)>,
     ) -> (Self::Commitment, Self::ProverData) {
+        let extension_domains = evaluations
+            .iter()
+            .map(|(d, _)| TwoAdicMultiplicativeCoset {
+                log_n: d.log_n + self.fri.log_blowup,
+                shift: Val::generator(),
+            })
+            .collect_vec();
         let ldes = self
-            .compute_coset_ldes_batches(evaluations)
+            .compute_coset_ldes_batches(evaluations, extension_domains)
             .into_iter()
             .map(|x| x.bit_reverse_rows().to_row_major_matrix())
             .collect();

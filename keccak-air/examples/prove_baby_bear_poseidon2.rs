@@ -8,7 +8,6 @@ use p3_field::Field;
 use p3_fri::{FriConfig, TwoAdicFriPcs};
 use p3_keccak_air::{generate_trace_rows, KeccakAir};
 use p3_matrix::Matrix;
-use p3_matrix::dense::RowMajorMatrix;
 use p3_merkle_tree::MerkleTreeMmcs;
 use p3_monty_31::dft::RecursiveDft;
 use p3_poseidon2::{Poseidon2, Poseidon2ExternalMatrixGeneral};
@@ -77,8 +76,20 @@ fn main() -> Result<(), impl Debug> {
     let config = MyConfig::new(pcs);
 
     let mut challenger = Challenger::new(perm.clone());
-    let proof = prove(&config, &KeccakAir {}, &mut challenger, trace, &PublicRow::<Val>::default());
+    let proof = prove(
+        &config,
+        &KeccakAir {},
+        &mut challenger,
+        trace,
+        PublicRow::<Val>::default(),
+    );
 
     let mut challenger = Challenger::new(perm);
-    verify(&config, &KeccakAir {}, &mut challenger, &proof, &RowMajorMatrix::new(vec![], 0))
+    verify(
+        &config,
+        &KeccakAir {},
+        &mut challenger,
+        &proof,
+        &PublicRow::default(),
+    )
 }

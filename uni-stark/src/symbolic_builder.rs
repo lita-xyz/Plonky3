@@ -97,7 +97,8 @@ impl<F: Field> SymbolicAirBuilder<F> {
         let public_values = [0, 1]
             .into_iter()
             .flat_map(|offset| {
-                (0..num_public_values).map(move |index| SymbolicVariable::new(Entry::Main { offset }, index))
+                (0..num_public_values)
+                    .map(move |index| SymbolicVariable::new(Entry::Main { offset }, index))
             })
             .collect();
         Self {
