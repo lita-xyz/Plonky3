@@ -7,8 +7,10 @@
 //!
 //! In particular we need public non-bit-reversed LDEs.
 use alloc::vec::Vec;
+
 use p3_field::ExtensionField;
-use p3_matrix::{dense::RowMajorMatrix, Matrix};
+use p3_matrix::dense::RowMajorMatrix;
+use p3_matrix::Matrix;
 
 use crate::pcs::{Pcs, Val};
 

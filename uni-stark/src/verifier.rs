@@ -3,14 +3,13 @@ use alloc::vec;
 use itertools::Itertools;
 use p3_air::{Air, BaseAir};
 use p3_challenger::{CanObserve, CanSample, FieldChallenger};
+// LITA
+use p3_commit::PcsValidaExt;
 use p3_commit::{Pcs, PolynomialSpace};
 use p3_field::{AbstractExtensionField, AbstractField, Field};
 use p3_matrix::dense::RowMajorMatrixView;
 use p3_matrix::stack::VerticalPair;
 use tracing::instrument;
-
-// LITA
-use p3_commit::PcsValidaExt;
 
 use crate::symbolic_builder::{get_log_quotient_degree, SymbolicAirBuilder};
 use crate::{PcsError, Proof, PublicValues, StarkGenericConfig, Val, VerifierConstraintFolder};

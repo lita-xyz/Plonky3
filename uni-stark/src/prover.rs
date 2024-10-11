@@ -5,6 +5,8 @@ use core::iter;
 use itertools::{izip, Itertools};
 use p3_air::Air;
 use p3_challenger::{CanObserve, CanSample, FieldChallenger};
+// LITA
+use p3_commit::PcsValidaExt;
 use p3_commit::{Pcs, PolynomialSpace};
 use p3_field::{AbstractExtensionField, AbstractField, PackedValue};
 use p3_matrix::dense::RowMajorMatrix;
@@ -12,9 +14,6 @@ use p3_matrix::Matrix;
 use p3_maybe_rayon::prelude::*;
 use p3_util::{log2_ceil_usize, log2_strict_usize};
 use tracing::{info_span, instrument};
-
-// LITA
-use p3_commit::PcsValidaExt;
 
 use crate::{
     get_symbolic_constraints, Commitments, Domain, OpenedValues, PackedChallenge, PackedVal, Proof,
