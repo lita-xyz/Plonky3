@@ -5,11 +5,12 @@ use core::ops::Range;
 
 use rand::distributions::{Distribution, Standard};
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 
 use crate::Matrix;
 
 /// A sparse matrix stored in the compressed sparse row format.
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct CsrMatrix<T> {
     width: usize,
 
