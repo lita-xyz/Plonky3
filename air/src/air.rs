@@ -121,7 +121,6 @@ pub trait AirBuilder: Sized {
 }
 
 pub trait AirBuilderWithPublicValues: AirBuilder {
-    // LITA: public values changed from vector to matrices https://github.com/lita-xyz/Plonky3/pull/1/commits/32eeeae9efaa5583aa6adfa89aca8679686709ee
     fn public_values(&self) -> Self::M;
 }
 

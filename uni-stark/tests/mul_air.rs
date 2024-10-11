@@ -7,7 +7,8 @@ use p3_baby_bear::{BabyBear, DiffusionMatrixBabyBear};
 use p3_challenger::{DuplexChallenger, HashChallenger, SerializingChallenger32};
 use p3_circle::CirclePcs;
 use p3_commit::testing::TrivialPcs;
-use p3_commit::{ExtensionMmcs, PcsValidaExt};
+use p3_commit::ExtensionMmcs;
+use p3_commit::PcsValidaExt; // LITA
 use p3_dft::Radix2DitParallel;
 use p3_field::extension::BinomialExtensionField;
 use p3_field::{AbstractField, Field};
@@ -21,7 +22,8 @@ use p3_poseidon2::{Poseidon2, Poseidon2ExternalMatrixGeneral};
 use p3_symmetric::{
     CompressionFunctionFromHasher, PaddingFreeSponge, SerializingHasher32, TruncatedPermutation,
 };
-use p3_uni_stark::{prove, verify, PublicRow, StarkConfig, StarkGenericConfig, Val};
+use p3_uni_stark::PublicRow; // LITA
+use p3_uni_stark::{prove, verify, StarkConfig, StarkGenericConfig, Val};
 use rand::distributions::{Distribution, Standard};
 use rand::{thread_rng, Rng};
 
@@ -123,7 +125,6 @@ fn do_test<SC: StarkGenericConfig>(
     challenger: SC::Challenger,
 ) -> Result<(), impl Debug>
 where
-    SC::Pcs: PcsValidaExt<SC::Challenge, SC::Challenger>,
     SC::Challenger: Clone,
     SC::Pcs: PcsValidaExt<SC::Challenge, SC::Challenger>,
     Standard: Distribution<Val<SC>>,

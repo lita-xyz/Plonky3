@@ -1,8 +1,13 @@
+//! Public Values for Valida
+//! Contrary to upstream https://github.com/Plonky3/Plonky3/pull/285
+//! this refactoring uses matrices instead of vectors
+
 use alloc::slice;
 use alloc::vec::Vec;
 use core::iter;
 
-use p3_commit::{PcsValidaExt, PolynomialSpace};
+use p3_commit::PcsValidaExt; // LITA
+use p3_commit::PolynomialSpace;
 use p3_field::{ExtensionField, Field};
 use p3_matrix::Matrix;
 pub trait PublicValues<F, E>: Matrix<F> + Sized + Clone

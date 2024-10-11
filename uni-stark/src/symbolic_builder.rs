@@ -11,13 +11,6 @@ use crate::symbolic_expression::SymbolicExpression;
 use crate::symbolic_variable::SymbolicVariable;
 use crate::Entry;
 
-// LITA:
-// our PR https://github.com/lita-xyz/Plonky3/pull/1/files#diff-47be236febbe934d75c88540029354b2f4bef731ee32df510f935fd261f7eb8e
-// conflicts with
-// - https://github.com/Plonky3/Plonky3/pull/285
-// - https://github.com/Plonky3/Plonky3/pull/348
-// but ultimately seems to be unnecessary after rebase
-
 #[instrument(name = "infer log of constraint degree", skip_all)]
 pub fn get_log_quotient_degree<F, A>(
     air: &A,
@@ -104,7 +97,6 @@ impl<F: Field> SymbolicAirBuilder<F> {
         Self {
             preprocessed: RowMajorMatrix::new(prep_values, preprocessed_width),
             main: RowMajorMatrix::new(main_values, width),
-            // TODO replace zeros once we have SymbolicExpression::PublicValue
             public_values: RowMajorMatrix::new(public_values, num_public_values.max(1)),
             constraints: vec![],
         }

@@ -1,4 +1,3 @@
-use core::fmt::Debug;
 use std::borrow::Borrow;
 
 use p3_air::{Air, AirBuilder, AirBuilderWithPublicValues, BaseAir};
@@ -26,17 +25,12 @@ impl<F> BaseAir<F> for FibonacciAir {
     }
 }
 
-impl<AB: AirBuilderWithPublicValues> Air<AB> for FibonacciAir
-where
-    AB::Var: Debug,
-    AB::M: Debug,
-{
+impl<AB: AirBuilderWithPublicValues> Air<AB> for FibonacciAir {
     fn eval(&self, builder: &mut AB) {
         let main = builder.main();
         let public_values = builder.public_values();
         // Only one row of public inputs
         let pis = public_values.row_slice(0);
-        println!("pis: {:?}", (*pis).to_vec());
 
         let a = pis[0];
         let b = pis[1];
@@ -46,8 +40,6 @@ where
         let local: &FibonacciRow<AB::Var> = (*_local).borrow();
         let next: &FibonacciRow<AB::Var> = (*_next).borrow();
 
-        println!("local: {:?}", local);
-        println!("next: {:?}", next);
         let mut when_first_row = builder.when_first_row();
 
         when_first_row.assert_eq(local.left, a);
@@ -87,7 +79,6 @@ pub fn generate_trace_rows<F: PrimeField64>(a: u64, b: u64, n: usize) -> RowMajo
 
 const NUM_FIBONACCI_COLS: usize = 2;
 
-#[derive(Debug)]
 pub struct FibonacciRow<F> {
     pub left: F,
     pub right: F,

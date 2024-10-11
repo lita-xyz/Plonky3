@@ -3,8 +3,7 @@ use alloc::vec;
 use itertools::Itertools;
 use p3_air::{Air, BaseAir};
 use p3_challenger::{CanObserve, CanSample, FieldChallenger};
-// LITA
-use p3_commit::PcsValidaExt;
+use p3_commit::PcsValidaExt; // LITA
 use p3_commit::{Pcs, PolynomialSpace};
 use p3_field::{AbstractExtensionField, AbstractField, Field};
 use p3_matrix::dense::RowMajorMatrixView;
@@ -142,8 +141,6 @@ where
         .interpolate(pcs, &[zeta, zeta_next], trace_domain)
         .try_into()
         .unwrap();
-    println!("public_local: {:?}", public_local);
-    println!("public_next: {:?}", public_next);
 
     let public = VerticalPair::new(
         RowMajorMatrixView::new_row(&public_local),
@@ -161,13 +158,6 @@ where
     };
     air.eval(&mut folder);
     let folded_constraints = folder.accumulator;
-    println!("folded_constraints: {:?}", folded_constraints);
-    println!("sels.inv_zeroifier: {:?}", sels.inv_zeroifier);
-    println!("quotient: {:?}", quotient);
-
-    println!("folded_constraints: {:?}", folded_constraints);
-    println!("quotient: {:?}", quotient);
-    println!("sels.inv_zeroifier: {:?}", sels.inv_zeroifier);
     // Finally, check that
     //     folded_constraints(zeta) / Z_H(zeta) = quotient(zeta)
     if folded_constraints * sels.inv_zeroifier != quotient {

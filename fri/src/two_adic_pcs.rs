@@ -329,10 +329,6 @@ where
             .flat_map(|(mats, _)| mats)
             .collect_vec();
 
-        // LITA: conflict to check between:
-        // - https://github.com/lita-xyz/Plonky3/pull/1/files#diff-a8b5740eb9a30586a2b9bc73f81d9ddeacfde0d39a8599fc9ee17dd772c6a08cR264
-        // - https://github.com/Plonky3/Plonky3/pull/286
-
         let global_max_height = mats.iter().map(|m| m.height()).max().unwrap();
         let log_global_max_height = log2_strict_usize(global_max_height);
 
