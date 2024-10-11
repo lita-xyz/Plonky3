@@ -13,6 +13,7 @@ use p3_field::{
     dot_product, AbstractExtensionField, AbstractField, ExtensionField, Field, PackedValue,
 };
 use p3_maybe_rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 use strided::{VerticallyStridedMatrixView, VerticallyStridedRowIndexMap};
 use tracing::instrument;
 
@@ -28,7 +29,7 @@ pub mod stack;
 pub mod strided;
 pub mod util;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Dimensions {
     pub width: usize,
     pub height: usize,
