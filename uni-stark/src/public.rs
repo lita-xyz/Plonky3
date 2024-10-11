@@ -2,9 +2,8 @@ use alloc::slice;
 use alloc::vec::Vec;
 use core::iter;
 
-use p3_commit::{Pcs, PcsValidaExt, PolynomialSpace};
-use p3_field::{ExtensionField, Field, TwoAdicField};
-use p3_matrix::dense::RowMajorMatrix;
+use p3_commit::{PcsValidaExt, PolynomialSpace};
+use p3_field::{ExtensionField, Field};
 use p3_matrix::Matrix;
 pub trait PublicValues<F, E>: Matrix<F> + Sized + Clone
 where
