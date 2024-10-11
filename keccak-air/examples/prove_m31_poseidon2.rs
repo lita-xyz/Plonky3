@@ -12,7 +12,7 @@ use p3_merkle_tree::MerkleTreeMmcs;
 use p3_mersenne_31::{DiffusionMatrixMersenne31, Mersenne31};
 use p3_poseidon2::{Poseidon2, Poseidon2ExternalMatrixGeneral};
 use p3_symmetric::{PaddingFreeSponge, TruncatedPermutation};
-use p3_uni_stark::{prove, verify, StarkConfig};
+use p3_uni_stark::{prove, verify, PublicRow, StarkConfig};
 use rand::{random, thread_rng};
 use tracing_forest::util::LevelFilter;
 use tracing_forest::ForestLayer;
@@ -78,8 +78,20 @@ fn main() -> Result<(), impl Debug> {
     let trace = generate_trace_rows::<Val>(inputs);
 
     let mut challenger = Challenger::new(perm.clone());
-    let proof = prove(&config, &KeccakAir {}, &mut challenger, trace, &vec![]);
+    let proof = prove(
+        &config,
+        &KeccakAir {},
+        &mut challenger,
+        trace,
+        PublicRow::default(),
+    );
 
     let mut challenger = Challenger::new(perm);
-    verify(&config, &KeccakAir {}, &mut challenger, &proof, &vec![])
+    verify(
+        &config,
+        &KeccakAir {},
+        &mut challenger,
+        &proof,
+        &PublicRow::default(),
+    )
 }

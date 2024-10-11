@@ -74,7 +74,6 @@ where
             ro,
             log_max_height,
         )?;
-
         if folded_eval != proof.final_poly {
             return Err(FriError::FinalPolyMismatch);
         }

@@ -12,7 +12,7 @@ use p3_mersenne_31::{GenericDiffusionMatrixMersenne31, Mersenne31};
 use p3_poseidon2::Poseidon2ExternalMatrixGeneral;
 use p3_poseidon2_air::{generate_vectorized_trace_rows, RoundConstants, VectorizedPoseidon2Air};
 use p3_symmetric::{CompressionFunctionFromHasher, PaddingFreeSponge, SerializingHasher32To64};
-use p3_uni_stark::{prove, verify, StarkConfig};
+use p3_uni_stark::{prove, verify, PublicRow, StarkConfig};
 use rand::{random, thread_rng};
 #[cfg(not(target_env = "msvc"))]
 use tikv_jemallocator::Jemalloc;
@@ -129,8 +129,14 @@ fn main() -> Result<(), impl Debug> {
     let config = MyConfig::new(pcs);
 
     let mut challenger = Challenger::from_hasher(vec![], byte_hash);
-    let proof = prove(&config, &air, &mut challenger, trace, &vec![]);
+    let proof = prove(&config, &air, &mut challenger, trace, PublicRow::default());
 
     let mut challenger = Challenger::from_hasher(vec![], byte_hash);
-    verify(&config, &air, &mut challenger, &proof, &vec![])
+    verify(
+        &config,
+        &air,
+        &mut challenger,
+        &proof,
+        &PublicRow::default(),
+    )
 }

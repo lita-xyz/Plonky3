@@ -5,6 +5,7 @@ use core::iter;
 use itertools::{izip, Itertools};
 use p3_air::Air;
 use p3_challenger::{CanObserve, CanSample, FieldChallenger};
+use p3_commit::PcsValidaExt; // LITA
 use p3_commit::{Pcs, PolynomialSpace};
 use p3_field::{AbstractExtensionField, AbstractField, PackedValue};
 use p3_matrix::dense::RowMajorMatrix;
@@ -15,8 +16,14 @@ use tracing::{info_span, instrument};
 
 use crate::{
     get_symbolic_constraints, Commitments, Domain, OpenedValues, PackedChallenge, PackedVal, Proof,
-    ProverConstraintFolder, StarkGenericConfig, SymbolicAirBuilder, SymbolicExpression, Val,
+    ProverConstraintFolder, PublicValues, StarkGenericConfig, SymbolicAirBuilder,
+    SymbolicExpression, Val,
 };
+
+//LITA:
+//  https://github.com/Plonky3/Plonky3/pull/253
+//  replaced direct LDE access with a "domain"
+//  valida-vm should be updated with the same approach
 
 #[instrument(skip_all)]
 #[allow(clippy::multiple_bound_locations)] // cfg not supported in where clauses?
@@ -24,24 +31,28 @@ pub fn prove<
     SC,
     #[cfg(debug_assertions)] A: for<'a> Air<crate::check_constraints::DebugConstraintBuilder<'a, Val<SC>>>,
     #[cfg(not(debug_assertions))] A,
+    P,
 >(
     config: &SC,
     air: &A,
     challenger: &mut SC::Challenger,
     trace: RowMajorMatrix<Val<SC>>,
-    public_values: &Vec<Val<SC>>,
+    public_values: P,
 ) -> Proof<SC>
 where
     SC: StarkGenericConfig,
     A: Air<SymbolicAirBuilder<Val<SC>>> + for<'a> Air<ProverConstraintFolder<'a, SC>>,
+    P: PublicValues<Val<SC>, SC::Challenge> + Sync,
+    <SC as StarkGenericConfig>::Pcs: PcsValidaExt<SC::Challenge, SC::Challenger>,
 {
     #[cfg(debug_assertions)]
-    crate::check_constraints::check_constraints(air, &trace, public_values);
+    crate::check_constraints::check_constraints(air, &trace, &public_values);
 
     let degree = trace.height();
     let log_degree = log2_strict_usize(degree);
 
-    let symbolic_constraints = get_symbolic_constraints::<Val<SC>, A>(air, 0, public_values.len());
+    let symbolic_constraints =
+        get_symbolic_constraints::<Val<SC>, A>(air, 0, public_values.width());
     let constraint_count = symbolic_constraints.len();
     let constraint_degree = symbolic_constraints
         .iter()
@@ -62,7 +73,9 @@ where
     // TODO: Might be best practice to include other instance data here; see verifier comment.
 
     challenger.observe(trace_commit.clone());
-    challenger.observe_slice(public_values);
+    for i in 0..public_values.height() {
+        challenger.observe_slice(&public_values.row_slice(i));
+    }
     let alpha: SC::Challenge = challenger.sample_ext_element();
 
     let quotient_domain =
@@ -70,9 +83,12 @@ where
 
     let trace_on_quotient_domain = pcs.get_evaluations_on_domain(&trace_data, 0, quotient_domain);
 
+    let public_trace_lde_for_quotient_domain =
+        public_values.get_evaluations_on_domain(pcs, trace_domain, quotient_domain);
+
     let quotient_values = quotient_values(
         air,
-        public_values,
+        &public_trace_lde_for_quotient_domain,
         trace_domain,
         quotient_domain,
         trace_on_quotient_domain,
@@ -125,9 +141,9 @@ where
 }
 
 #[instrument(name = "compute quotient polynomial", skip_all)]
-fn quotient_values<SC, A, Mat>(
+fn quotient_values<SC, A, Mat, PubMat>(
     air: &A,
-    public_values: &Vec<Val<SC>>,
+    public_values: &PubMat,
     trace_domain: Domain<SC>,
     quotient_domain: Domain<SC>,
     trace_on_quotient_domain: Mat,
@@ -137,6 +153,7 @@ fn quotient_values<SC, A, Mat>(
 where
     SC: StarkGenericConfig,
     A: for<'a> Air<ProverConstraintFolder<'a, SC>>,
+    PubMat: Matrix<Val<SC>> + Sync,
     Mat: Matrix<Val<SC>> + Sync,
 {
     let quotient_size = quotient_domain.size();
@@ -177,10 +194,18 @@ where
                 width,
             );
 
+            let public = RowMajorMatrix::new(
+                iter::empty()
+                    .chain(public_values.vertically_packed_row(i_start))
+                    .chain(public_values.vertically_packed_row(i_start + next_step))
+                    .collect_vec(),
+                public_values.width(),
+            );
+
             let accumulator = PackedChallenge::<SC>::zero();
             let mut folder = ProverConstraintFolder {
                 main: main.as_view(),
-                public_values,
+                public_values: public.as_view(),
                 is_first_row,
                 is_last_row,
                 is_transition,

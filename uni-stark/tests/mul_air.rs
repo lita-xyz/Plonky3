@@ -8,6 +8,7 @@ use p3_challenger::{DuplexChallenger, HashChallenger, SerializingChallenger32};
 use p3_circle::CirclePcs;
 use p3_commit::testing::TrivialPcs;
 use p3_commit::ExtensionMmcs;
+use p3_commit::PcsValidaExt; // LITA
 use p3_dft::Radix2DitParallel;
 use p3_field::extension::BinomialExtensionField;
 use p3_field::{AbstractField, Field};
@@ -21,6 +22,7 @@ use p3_poseidon2::{Poseidon2, Poseidon2ExternalMatrixGeneral};
 use p3_symmetric::{
     CompressionFunctionFromHasher, PaddingFreeSponge, SerializingHasher32, TruncatedPermutation,
 };
+use p3_uni_stark::PublicRow; // LITA
 use p3_uni_stark::{prove, verify, StarkConfig, StarkGenericConfig, Val};
 use rand::distributions::{Distribution, Standard};
 use rand::{thread_rng, Rng};
@@ -124,12 +126,19 @@ fn do_test<SC: StarkGenericConfig>(
 ) -> Result<(), impl Debug>
 where
     SC::Challenger: Clone,
+    SC::Pcs: PcsValidaExt<SC::Challenge, SC::Challenger>,
     Standard: Distribution<Val<SC>>,
 {
     let trace = air.random_valid_trace(log_height, true);
 
     let mut p_challenger = challenger.clone();
-    let proof = prove(&config, &air, &mut p_challenger, trace, &vec![]);
+    let proof = prove(
+        &config,
+        &air,
+        &mut p_challenger,
+        trace,
+        PublicRow::default(),
+    );
 
     let serialized_proof = postcard::to_allocvec(&proof).expect("unable to serialize proof");
     tracing::debug!("serialized_proof len: {} bytes", serialized_proof.len());
@@ -143,7 +152,7 @@ where
         &air,
         &mut v_challenger,
         &deserialized_proof,
-        &vec![],
+        &PublicRow::default(),
     )
 }
 

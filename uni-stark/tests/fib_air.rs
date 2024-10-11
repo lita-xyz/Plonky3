@@ -13,7 +13,7 @@ use p3_matrix::Matrix;
 use p3_merkle_tree::MerkleTreeMmcs;
 use p3_poseidon2::{Poseidon2, Poseidon2ExternalMatrixGeneral};
 use p3_symmetric::{PaddingFreeSponge, TruncatedPermutation};
-use p3_uni_stark::{prove, verify, StarkConfig};
+use p3_uni_stark::{prove, verify, PublicRow, StarkConfig};
 use rand::thread_rng;
 
 /// For testing the public values feature
@@ -28,15 +28,17 @@ impl<F> BaseAir<F> for FibonacciAir {
 impl<AB: AirBuilderWithPublicValues> Air<AB> for FibonacciAir {
     fn eval(&self, builder: &mut AB) {
         let main = builder.main();
-        let pis = builder.public_values();
+        let public_values = builder.public_values();
+        // Only one row of public inputs
+        let pis = public_values.row_slice(0);
 
         let a = pis[0];
         let b = pis[1];
         let x = pis[2];
 
-        let (local, next) = (main.row_slice(0), main.row_slice(1));
-        let local: &FibonacciRow<AB::Var> = (*local).borrow();
-        let next: &FibonacciRow<AB::Var> = (*next).borrow();
+        let (_local, _next) = (main.row_slice(0), main.row_slice(1));
+        let local: &FibonacciRow<AB::Var> = (*_local).borrow();
+        let next: &FibonacciRow<AB::Var> = (*_next).borrow();
 
         let mut when_first_row = builder.when_first_row();
 
@@ -134,12 +136,18 @@ fn test_public_value() {
     let pcs = Pcs::new(dft, val_mmcs, fri_config);
     let config = MyConfig::new(pcs);
     let mut challenger = Challenger::new(perm.clone());
-    let pis = vec![
+    let pis = PublicRow(vec![
         BabyBear::from_canonical_u64(0),
         BabyBear::from_canonical_u64(1),
         BabyBear::from_canonical_u64(21),
-    ];
-    let proof = prove(&config, &FibonacciAir {}, &mut challenger, trace, &pis);
+    ]);
+    let proof = prove(
+        &config,
+        &FibonacciAir {},
+        &mut challenger,
+        trace,
+        pis.clone(),
+    );
     let mut challenger = Challenger::new(perm);
     verify(&config, &FibonacciAir {}, &mut challenger, &proof, &pis).expect("verification failed");
 }
@@ -168,10 +176,18 @@ fn test_incorrect_public_value() {
     let pcs = Pcs::new(dft, val_mmcs, fri_config);
     let config = MyConfig::new(pcs);
     let mut challenger = Challenger::new(perm.clone());
-    let pis = vec![
+    let pis = PublicRow(vec![
         BabyBear::from_canonical_u64(0),
         BabyBear::from_canonical_u64(1),
         BabyBear::from_canonical_u64(123_123), // incorrect result
-    ];
-    prove(&config, &FibonacciAir {}, &mut challenger, trace, &pis);
+    ]);
+    let proof = prove(
+        &config,
+        &FibonacciAir {},
+        &mut challenger,
+        trace,
+        pis.clone(),
+    );
+    let mut challenger = Challenger::new(perm.clone());
+    verify(&config, &FibonacciAir {}, &mut challenger, &proof, &pis).expect("verification failed");
 }

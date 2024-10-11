@@ -11,7 +11,7 @@ use p3_matrix::Matrix;
 use p3_merkle_tree::MerkleTreeMmcs;
 use p3_monty_31::dft::RecursiveDft;
 use p3_symmetric::{CompressionFunctionFromHasher, SerializingHasher32};
-use p3_uni_stark::{prove, verify, StarkConfig};
+use p3_uni_stark::{prove, verify, PublicRow, StarkConfig};
 use rand::random;
 use tracing_forest::util::LevelFilter;
 use tracing_forest::ForestLayer;
@@ -69,8 +69,20 @@ fn main() -> Result<(), impl Debug> {
     let config = MyConfig::new(pcs);
 
     let mut challenger = Challenger::from_hasher(vec![], byte_hash);
-    let proof = prove(&config, &KeccakAir {}, &mut challenger, trace, &vec![]);
+    let proof = prove(
+        &config,
+        &KeccakAir {},
+        &mut challenger,
+        trace,
+        PublicRow::<Val>::default(),
+    );
 
     let mut challenger = Challenger::from_hasher(vec![], byte_hash);
-    verify(&config, &KeccakAir {}, &mut challenger, &proof, &vec![])
+    verify(
+        &config,
+        &KeccakAir {},
+        &mut challenger,
+        &proof,
+        &PublicRow::default(),
+    )
 }
