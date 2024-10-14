@@ -16,7 +16,7 @@ use p3_field::{
 };
 use p3_interpolation::interpolate_coset;
 use p3_matrix::bitrev::{BitReversableMatrix, BitReversalPerm};
-use p3_matrix::dense::RowMajorMatrix;
+use p3_matrix::dense::{DenseMatrix, RowMajorMatrix};
 use p3_matrix::{Dimensions, Matrix};
 use p3_maybe_rayon::prelude::*;
 use p3_util::linear_map::LinearMap;
@@ -39,6 +39,8 @@ impl<Val, Dft, InputMmcs, FriMmcs> TwoAdicFriPcs<Val, Dft, InputMmcs, FriMmcs>
 where
     Val: TwoAdicField,
     Dft: TwoAdicSubgroupDft<Val>,
+    InputMmcs: Sync,
+    FriMmcs: Sync,
 {
     pub const fn new(dft: Dft, mmcs: InputMmcs, fri: FriConfig<FriMmcs>) -> Self {
         Self {
@@ -56,14 +58,15 @@ where
     ) -> Vec<RowMajorMatrix<Val>> {
         debug_assert_eq!(evaluations.len(), extension_domains.len());
         evaluations
-            .into_iter()
+            .iter() // LITA: cannot be made parallel as the Radix2DitParallel Dft uses memoization and the state introduced hinders parallelism
             .zip(extension_domains)
             .map(|((domain, evals), extension_domain)| {
                 assert_eq!(domain.size(), evals.height());
                 let shift = extension_domain.shift / domain.shift;
                 assert!(extension_domain.log_n >= domain.log_n);
                 self.dft
-                    .coset_lde_batch(evals, extension_domain.log_n - domain.log_n, shift)
+                    // LITA: TODO remove the clone
+                    .coset_lde_batch(evals.clone(), extension_domain.log_n - domain.log_n, shift)
                     .to_row_major_matrix()
             })
             .collect()
@@ -75,8 +78,13 @@ impl<Val, Dft, InputMmcs, FriMmcs, Challenge, Challenger> PcsValidaExt<Challenge
 where
     Val: TwoAdicField,
     Dft: TwoAdicSubgroupDft<Val>,
-    InputMmcs: Mmcs<Val>,
-    FriMmcs: Mmcs<Challenge>,
+    InputMmcs: Mmcs<Val> + Sync,
+    <InputMmcs as Mmcs<Val>>::Proof: Send + Sync,
+    <InputMmcs as Mmcs<Val>>::Error: Sync,
+    <InputMmcs as Mmcs<Val>>::ProverData<DenseMatrix<Val>>: Sync,
+    FriMmcs: Mmcs<Challenge> + Sync,
+    <FriMmcs as Mmcs<Challenge>>::Proof: Send,
+    <FriMmcs as Mmcs<Challenge>>::ProverData<DenseMatrix<Challenge>>: Send + Sync,
     Challenge: TwoAdicField + ExtensionField<Val>,
     Challenger:
         FieldChallenger<Val> + CanObserve<FriMmcs::Commitment> + GrindingChallenger<Witness = Val>,
@@ -205,8 +213,13 @@ impl<Val, Dft, InputMmcs, FriMmcs, Challenge, Challenger> Pcs<Challenge, Challen
 where
     Val: TwoAdicField,
     Dft: TwoAdicSubgroupDft<Val>,
-    InputMmcs: Mmcs<Val>,
-    FriMmcs: Mmcs<Challenge>,
+    InputMmcs: Mmcs<Val> + Sync,
+    <InputMmcs as Mmcs<Val>>::Proof: Send + Sync,
+    <InputMmcs as Mmcs<Val>>::Error: Sync,
+    <InputMmcs as Mmcs<Val>>::ProverData<DenseMatrix<Val>>: Sync,
+    FriMmcs: Mmcs<Challenge> + Sync,
+    <FriMmcs as Mmcs<Challenge>>::Proof: Send,
+    <FriMmcs as Mmcs<Challenge>>::ProverData<DenseMatrix<Challenge>>: Send + Sync,
     Challenge: TwoAdicField + ExtensionField<Val>,
     Challenger:
         FieldChallenger<Val> + CanObserve<FriMmcs::Commitment> + GrindingChallenger<Witness = Val>,
@@ -238,7 +251,7 @@ where
             .collect_vec();
         let ldes = self
             .compute_coset_ldes_batches(evaluations, extension_domains)
-            .into_iter()
+            .into_par_iter()
             .map(|x| x.bit_reverse_rows().to_row_major_matrix())
             .collect();
 
@@ -341,30 +354,52 @@ where
         let mut reduced_openings: [_; 32] = core::array::from_fn(|_| None);
         let mut num_reduced = [0; 32];
 
-        for (mats, points) in mats_and_points {
+        // Compute all barycentric interpolations in parallel
+        let log_blowup = self.fri.log_blowup;
+        let ys_outer: Vec<Vec<Vec<Vec<Challenge>>>> = mats_and_points
+            .par_iter()
+            .map(|(mats, points)| {
+                // LITA: TODO add multizip shim for Rayon/non-rayon
+                izip!(mats, (*points).clone())
+                    .collect::<Vec<_>>()
+                    .par_iter()
+                    .map(|(mat, points_for_mat)| {
+                        points_for_mat
+                            .par_iter()
+                            .map(|&point| {
+                                // Use Barycentric interpolation to evaluate the matrix at the given point.
+                                info_span!("compute opened values with Lagrange interpolation")
+                                    .in_scope(|| {
+                                        let (low_coset, _) =
+                                            mat.split_rows(mat.height() >> log_blowup);
+                                        interpolate_coset(
+                                            &BitReversalPerm::new_view(low_coset),
+                                            Val::generator(),
+                                            point,
+                                        )
+                                    })
+                            })
+                            .collect()
+                    })
+                    .collect()
+            })
+            .collect();
+
+        for (i, (mats, points)) in mats_and_points.iter().enumerate() {
             let opened_values_for_round = all_opened_values.pushed_mut(vec![]);
-            for (mat, points_for_mat) in izip!(mats, points) {
+            for (j, (mat, points_for_mat)) in izip!(mats, *points).enumerate() {
                 let log_height = log2_strict_usize(mat.height());
                 let reduced_opening_for_log_height = reduced_openings[log_height]
                     .get_or_insert_with(|| vec![Challenge::zero(); mat.height()]);
                 debug_assert_eq!(reduced_opening_for_log_height.len(), mat.height());
 
                 let opened_values_for_mat = opened_values_for_round.pushed_mut(vec![]);
-                for &point in points_for_mat {
+                for (k, &point) in points_for_mat.iter().enumerate() {
                     let _guard =
                         info_span!("reduce matrix quotient", dims = %mat.dimensions()).entered();
 
                     // Use Barycentric interpolation to evaluate the matrix at the given point.
-                    let ys = info_span!("compute opened values with Lagrange interpolation")
-                        .in_scope(|| {
-                            let (low_coset, _) =
-                                mat.split_rows(mat.height() >> self.fri.log_blowup);
-                            interpolate_coset(
-                                &BitReversalPerm::new_view(low_coset),
-                                Val::generator(),
-                                point,
-                            )
-                        });
+                    let ys = ys_outer[i][j][k].clone();
 
                     let alpha_pow_offset = alpha.exp_u64(num_reduced[log_height] as u64);
                     let reduced_ys: Challenge = dot_product(alpha.powers(), ys.iter().copied());
