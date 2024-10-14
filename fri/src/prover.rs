@@ -58,16 +58,15 @@ where
 
         let commit_phase_openings: Vec<_> = query_indices
             .into_par_iter()
-            .map(|index| answer_query(
-                config,
-                &commit_phase_result.data,
-                index >> extra_bits,
-            ))
+            .map(|index| answer_query(config, &commit_phase_result.data, index >> extra_bits))
             .collect();
 
         // LITA TODO: Support rayon multizip with a shim for non-parallel
         izip!(input_proofs, commit_phase_openings)
-            .map(|(input_proof, commit_phase_openings)| QueryProof {input_proof, commit_phase_openings})
+            .map(|(input_proof, commit_phase_openings)| QueryProof {
+                input_proof,
+                commit_phase_openings,
+            })
             .collect()
     });
 
