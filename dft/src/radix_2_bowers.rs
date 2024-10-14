@@ -112,13 +112,13 @@ fn butterfly_layer<F: Field, B: Butterfly<F>>(
     half_block_size: usize,
     twiddles: &[B],
 ) {
-    mat.par_row_chunks_exact_mut(2 * half_block_size)
+    mat.par_row_chunks_exact_mut(2 * half_block_size) // LITA: check if worth it to unparallelize
         .enumerate()
         .for_each(|(block, mut chunks)| {
             let (mut hi_chunks, mut lo_chunks) = chunks.split_rows_mut(half_block_size);
             hi_chunks
-                .par_rows_mut()
-                .zip(lo_chunks.par_rows_mut())
+                .par_rows_mut() // LITA: check if worth it to unparallelize
+                .zip(lo_chunks.par_rows_mut()) // LITA: check if worth it to unparallelize
                 .for_each(|(hi_chunk, lo_chunk)| {
                     if block == 0 {
                         TwiddleFreeButterfly.apply_to_rows(hi_chunk, lo_chunk)
