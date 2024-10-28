@@ -39,6 +39,8 @@ impl<Val, Dft, InputMmcs, FriMmcs> TwoAdicFriPcs<Val, Dft, InputMmcs, FriMmcs>
 where
     Val: TwoAdicField,
     Dft: TwoAdicSubgroupDft<Val>,
+    InputMmcs: Sync,
+    FriMmcs: Sync,
 {
     pub const fn new(dft: Dft, mmcs: InputMmcs, fri: FriConfig<FriMmcs>) -> Self {
         Self {
@@ -56,7 +58,7 @@ where
     ) -> Vec<RowMajorMatrix<Val>> {
         debug_assert_eq!(evaluations.len(), extension_domains.len());
         evaluations
-            .into_iter()
+            .into_iter() // LITA: cannot be made parallel as the Radix2DitParallel Dft uses memoization and the state introduced hinders parallelism
             .zip(extension_domains)
             .map(|((domain, evals), extension_domain)| {
                 assert_eq!(domain.size(), evals.height());
@@ -75,8 +77,13 @@ impl<Val, Dft, InputMmcs, FriMmcs, Challenge, Challenger> PcsValidaExt<Challenge
 where
     Val: TwoAdicField,
     Dft: TwoAdicSubgroupDft<Val>,
-    InputMmcs: Mmcs<Val>,
-    FriMmcs: Mmcs<Challenge>,
+    InputMmcs: Mmcs<Val> + Sync,
+    <InputMmcs as Mmcs<Val>>::Proof: Send + Sync,
+    <InputMmcs as Mmcs<Val>>::Error: Sync,
+    <InputMmcs as Mmcs<Val>>::ProverData<DenseMatrix<Val>>: Sync,
+    FriMmcs: Mmcs<Challenge> + Sync,
+    <FriMmcs as Mmcs<Challenge>>::Proof: Send,
+    <FriMmcs as Mmcs<Challenge>>::ProverData<DenseMatrix<Challenge>>: Send + Sync,
     Challenge: TwoAdicField + ExtensionField<Val>,
     Challenger:
         FieldChallenger<Val> + CanObserve<FriMmcs::Commitment> + GrindingChallenger<Witness = Val>,
@@ -206,8 +213,13 @@ impl<Val, Dft, InputMmcs, FriMmcs, Challenge, Challenger> Pcs<Challenge, Challen
 where
     Val: TwoAdicField,
     Dft: TwoAdicSubgroupDft<Val>,
-    InputMmcs: Mmcs<Val>,
-    FriMmcs: Mmcs<Challenge>,
+    InputMmcs: Mmcs<Val> + Sync,
+    <InputMmcs as Mmcs<Val>>::Proof: Send + Sync,
+    <InputMmcs as Mmcs<Val>>::Error: Sync,
+    <InputMmcs as Mmcs<Val>>::ProverData<DenseMatrix<Val>>: Sync,
+    FriMmcs: Mmcs<Challenge> + Sync,
+    <FriMmcs as Mmcs<Challenge>>::Proof: Send,
+    <FriMmcs as Mmcs<Challenge>>::ProverData<DenseMatrix<Challenge>>: Send + Sync,
     Challenge: TwoAdicField + ExtensionField<Val>,
     Challenger:
         FieldChallenger<Val> + CanObserve<FriMmcs::Commitment> + GrindingChallenger<Witness = Val>,
@@ -240,7 +252,7 @@ where
             .collect_vec();
         let ldes = self
             .compute_coset_ldes_batches(evaluations, extension_domains)
-            .into_iter()
+            .into_par_iter()
             .map(|x| x.bit_reverse_rows().to_row_major_matrix())
             .collect();
 
@@ -339,14 +351,28 @@ where
         // for that point, and precompute 1/(z - X) for the largest subgroup (in bitrev order).
         let inv_denoms = compute_inverse_denominators(&mats_and_points, Val::GENERATOR);
 
-        // Evaluate coset representations and write openings to the challenger
-        let all_opened_values = mats_and_points
-            .iter()
+        // LITA: The following part merges together 2 tricky changes:
+        // - A large parallelism optimization in this routine that already takes ~30% of the runtime:
+        //   https://github.com/lita-xyz/Plonky3/commit/1282cc19aa0f8b1e1974f58e7a6de2a8034f3a53
+        // - A security fix that adds intermediate values to the transcript to prevent forgeries:
+        //   https://github.com/Plonky3/Plonky3/pull/627/files
+        //   Security advisory: https://github.com/Plonky3/Plonky3/security/advisories/GHSA-vrmm-4mm5-38vm
+        // Careful review required
+        // In summary ys_outer in the parallel PR
+        // == all_opened_values in the security advisory PR
+        // so we can reapply the parallelism trick from our optimization
+        // to the security advisory and the changes ends up being
+        // MORE maintainable regarding upstream compared to before
+
+        // Compute all barycentric interpolations / coset representations in parallel
+        let log_blowup = self.fri.log_blowup;
+        let all_opened_values: OpenedValues<Challenge> = mats_and_points
+            .par_iter()
             .map(|(mats, points)| {
-                izip!(mats.iter(), points.iter())
+                mats.par_iter().zip(points.par_iter())
                     .map(|(mat, points_for_mat)| {
                         points_for_mat
-                            .iter()
+                            .par_iter()
                             .map(|&point| {
                                 let _guard =
                                     info_span!("evaluate matrix", dims = %mat.dimensions())
@@ -356,7 +382,7 @@ where
                                 let ys =
                                     info_span!("compute opened values with Lagrange interpolation")
                                         .in_scope(|| {
-                                            let h = mat.height() >> self.fri.log_blowup;
+                                            let h = mat.height() >> log_blowup;
                                             let (low_coset, _) = mat.split_rows(h);
                                             let mut inv_denoms =
                                                 inv_denoms.get(&point).unwrap()[..h].to_vec();
@@ -368,14 +394,26 @@ where
                                                 Some(&inv_denoms),
                                             )
                                         });
-                                ys.iter().for_each(|&y| challenger.observe_ext_element(y));
                                 ys
                             })
-                            .collect_vec()
+                            .collect()
                     })
-                    .collect_vec()
+                    .collect()
             })
-            .collect_vec();
+            .collect();
+
+        for i in 0 .. all_opened_values.len() {
+            // (mats, points)
+            for j in 0 .. all_opened_values[i].len() {
+                // (_, points for mat)
+                for k in 0 .. all_opened_values[i][j].len() {
+                    // points
+                    let ys = &all_opened_values[i][j][k];
+                    // Security advisory: https://github.com/Plonky3/Plonky3/security/advisories/GHSA-vrmm-4mm5-38vm
+                    ys.iter().for_each(|&y| challenger.observe_ext_element(y));
+                }
+            }
+        }
 
         // Batch combination challenge
         let alpha: Challenge = challenger.sample_ext_element();

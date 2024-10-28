@@ -28,7 +28,7 @@ pub mod prelude {
 
 #[cfg(feature = "parallel")]
 pub mod iter {
-    pub use rayon::iter::repeat;
+    pub use rayon::iter::{repeat, Zip};
 }
 
 #[cfg(not(feature = "parallel"))]
@@ -38,6 +38,7 @@ mod serial;
 pub mod prelude {
     pub use core::iter::{
         ExactSizeIterator as IndexedParallelIterator, Iterator as ParallelIterator,
+        Zip
     };
 
     pub use super::serial::*;

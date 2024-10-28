@@ -60,11 +60,18 @@ where
             .collect();
         let diff_invs = batch_multiplicative_inverse(&diffs);
         subgroup
+            // LITA: PR #549 (https://github.com/Plonky3/Plonky3/pull/549)
+            // recovers some parallelism that upstream lost (details in following comment)
             .par_iter()
             .zip(diff_invs)
             .map(|(&sg, diff_inv)| diff_inv * sg)
             .collect()
     };
+
+    // LITA: our parallelism optimization here has been superceded
+    // by upstream columnwise_dot_product, which also has 2 levels of parallelism.
+    // See: https://github.com/lita-xyz/Plonky3/commit/1282cc19aa0f8b1e1974f58e7a6de2a8034f3a53#diff-c8307398fd810a26e0cd2e333f21f417ebe586aa9581e77ccf68660b60498022L48
+    // vs: https://github.com/Plonky3/Plonky3/pull/300/files#diff-24cbd5dc216765df386bbe3f0dd744c5d427e1444a6527d5fbd11d51eb2f3cc3R137
     let sum = coset_evals.columnwise_dot_product(&col_scale);
 
     let zerofier = two_adic_coset_zerofier::<EF>(log_height, EF::from_base(shift), point);

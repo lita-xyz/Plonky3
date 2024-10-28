@@ -1,13 +1,13 @@
 use alloc::vec;
 use alloc::vec::Vec;
-use core::iter;
 
 use itertools::{izip, Itertools};
 use p3_challenger::{CanObserve, FieldChallenger, GrindingChallenger};
 use p3_commit::Mmcs;
 use p3_dft::{Radix2Dit, TwoAdicSubgroupDft};
 use p3_field::{ExtensionField, Field, TwoAdicField};
-use p3_matrix::dense::RowMajorMatrix;
+use p3_matrix::dense::{DenseMatrix, RowMajorMatrix};
+use p3_maybe_rayon::prelude::*;
 use p3_util::{log2_strict_usize, reverse_slice_index_bits};
 use tracing::{debug_span, info_span, instrument};
 
@@ -24,7 +24,9 @@ pub fn prove<G, Val, Challenge, M, Challenger>(
 where
     Val: Field,
     Challenge: ExtensionField<Val> + TwoAdicField,
-    M: Mmcs<Challenge>,
+    M: Mmcs<Challenge> + Sync,
+    <M as Mmcs<Challenge>>::Proof: Send,
+    <M as Mmcs<Challenge>>::ProverData<DenseMatrix<Challenge>>: Sync,
     Challenger: FieldChallenger<Val> + GrindingChallenger + CanObserve<M::Commitment>,
     G: FriGenericConfig<Challenge>,
 {
@@ -48,15 +50,30 @@ where
     let pow_witness = challenger.grind(config.proof_of_work_bits);
 
     let query_proofs = info_span!("query phase").in_scope(|| {
-        iter::repeat_with(|| challenger.sample_bits(log_max_height + g.extra_query_index_bits()))
-            .take(config.num_queries)
-            .map(|index| QueryProof {
-                input_proof: open_input(index),
-                commit_phase_openings: answer_query(
-                    config,
-                    &commit_phase_result.data,
-                    index >> g.extra_query_index_bits(),
-                ),
+        // LITA: undo https://github.com/Plonky3/Plonky3/pull/333/commits/a202042a0d7f102830f548751555560e48677148#diff-28b0919b8d62afd4eb098b9d57ad393727c0dd95138fab75b1bef5244eb45e71R42
+        let query_indices: Vec<usize> = (0..config.num_queries)
+            .map(|_| challenger.sample_bits(log_max_height + g.extra_query_index_bits()))
+            .collect();
+
+        // LITA: to avoid requiring Dft: Sync, we compute `open_input` separately from `answer_query`
+        // The Radix2DIT DFT memoizes twiddle factors and that state makes it non-trivial to call in parallel.
+        let input_proofs: Vec<_> = query_indices
+            .iter()
+            .map(|index| open_input(*index))
+            .collect();
+
+        let extra_bits = g.extra_query_index_bits();
+
+        let commit_phase_openings: Vec<_> = query_indices
+            .into_par_iter()
+            .map(|index| answer_query(config, &commit_phase_result.data, index >> extra_bits))
+            .collect();
+
+        // LITA TODO: parallelize this
+        input_proofs.into_iter().zip(commit_phase_openings.into_iter())
+            .map(|(input_proof, commit_phase_openings)| QueryProof {
+                input_proof,
+                commit_phase_openings,
             })
             .collect()
     });
