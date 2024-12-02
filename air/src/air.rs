@@ -158,7 +158,7 @@ pub trait ExtensionBuilder: AirBuilder {
 pub trait PermutationAirBuilder: ExtensionBuilder {
     type MP: Matrix<Self::VarEF>;
 
-    type RandomVar: Into<Self::ExprEF> + Copy;
+    type RandomVar: Into<Self::ExprEF> + Clone;
 
     fn permutation(&self) -> Self::MP;
 
