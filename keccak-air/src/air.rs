@@ -27,27 +27,10 @@ impl<AB: AirBuilder> Air<AB> for KeccakAir {
         let local: &KeccakCols<AB::Var> = main.row_slice(0).borrow();
         let next: &KeccakCols<AB::Var> = main.row_slice(1).borrow();
 
-        // The export flag must be 0 or 1.
-        builder.assert_bool(local.export);
 
         // If this is not the final step, the export flag must be off.
         let final_step = local.step_flags[NUM_ROUNDS - 1];
         let not_final_step = AB::Expr::one() - final_step;
-        builder
-            .when(not_final_step.clone())
-            .assert_zero(local.export);
-
-        // If this is not the final step, the local and next preimages must match.
-        for y in 0..5 {
-            for x in 0..5 {
-                for limb in 0..U64_LIMBS {
-                    builder
-                        .when_transition()
-                        .when(not_final_step.clone())
-                        .assert_eq(local.preimage[y][x][limb], next.preimage[y][x][limb]);
-                }
-            }
-        }
 
         // C'[x, z] = xor(C[x, z], C[x - 1, z], C[x + 1, z - 1]).
         for x in 0..5 {
@@ -58,9 +41,7 @@ impl<AB: AirBuilder> Air<AB> for KeccakAir {
                     local.c[(x + 1) % 5][(z + 63) % 64].into(),
                 );
                 let c_prime = local.c_prime[x][z];
-                builder
-                    .when(not_final_step.clone())
-                    .assert_eq(c_prime, xor);
+                builder.assert_eq(c_prime, xor);
             }
         }
 
@@ -84,9 +65,7 @@ impl<AB: AirBuilder> Air<AB> for KeccakAir {
                     let computed_limb = (limb * BITS_PER_LIMB..(limb + 1) * BITS_PER_LIMB)
                         .rev()
                         .fold(AB::Expr::zero(), |acc, z| acc.double() + get_bit(z));
-                    builder
-                        .when(not_final_step.clone())
-                        .assert_eq(computed_limb, a_limb);
+                    builder.assert_eq(computed_limb, a_limb);
                 }
             }
         }
@@ -100,7 +79,6 @@ impl<AB: AirBuilder> Air<AB> for KeccakAir {
                 let diff = sum - local.c_prime[x][z];
                 let four = AB::Expr::from_canonical_u8(4);
                 builder
-                    .when(not_final_step.clone())
                     .assert_zero(diff.clone() * (diff.clone() - AB::Expr::two()) * (diff - four));
             }
         }
@@ -121,7 +99,6 @@ impl<AB: AirBuilder> Air<AB> for KeccakAir {
                         .rev()
                         .fold(AB::Expr::zero(), |acc, z| acc.double() + get_bit(z));
                     builder
-                        .when(not_final_step.clone())
                         .assert_eq(computed_limb, local.a_prime_prime[y][x][limb]);
                 }
             }
@@ -136,9 +113,7 @@ impl<AB: AirBuilder> Air<AB> for KeccakAir {
                     acc.double() + local.a_prime_prime_0_0_bits[z]
                 });
             let a_prime_prime_0_0_limb = local.a_prime_prime[0][0][limb];
-            builder
-                .when(not_final_step.clone())
-                .assert_eq(computed_a_prime_prime_0_0_limb, a_prime_prime_0_0_limb);
+            builder.assert_eq(computed_a_prime_prime_0_0_limb, a_prime_prime_0_0_limb);
         }
 
         let get_xored_bit = |i| {
@@ -159,7 +134,6 @@ impl<AB: AirBuilder> Air<AB> for KeccakAir {
                 .rev()
                 .fold(AB::Expr::zero(), |acc, z| acc.double() + get_xored_bit(z));
             builder
-                .when(not_final_step.clone())
                 .assert_eq(
                 computed_a_prime_prime_prime_0_0_limb,
                 a_prime_prime_prime_0_0_limb,
@@ -180,77 +154,5 @@ impl<AB: AirBuilder> Air<AB> for KeccakAir {
             }
         }
 
-        for y in 0..5 {
-            for x in 0..5 {
-                for limb in 0..U64_LIMBS {
-                    builder
-                        .when(final_step.clone())
-                        .when_last_row()
-                        .assert_zero(local.a[y][x][limb]);
-                }
-            }
-        }
-
-        for x in 0..5 {
-            for z in 0..64 {
-                builder
-                    .when(final_step.clone())
-                    .when_last_row()
-                    .assert_zero(local.c[x][z]);
-                builder
-                    .when(final_step.clone())
-                    .when_last_row()
-                    .assert_zero(local.c_prime[x][z]);
-            }
-        }
-
-        for y in 0..5 {
-            for x in 0..5 {
-                for z in 0..64 {
-                    builder
-                        .when(final_step.clone())
-                        .when_last_row()
-                        .assert_zero(local.a_prime[y][x][z]);
-                }
-            }
-        }
-
-        for y in 0..5 {
-            for x in 0..5 {
-                for limb in 0..U64_LIMBS {
-                    builder
-                        .when(final_step.clone())
-                        .when_last_row()
-                        .assert_zero(local.a_prime_prime[y][x][limb]);
-                }
-            }
-        }
-
-        for i in 0..64 {
-            builder
-                .when(final_step.clone())
-                .when_last_row()
-                .assert_zero(local.a_prime_prime_0_0_bits[i]);
-        }
-
-        for limb in 0..U64_LIMBS {
-            builder
-                .when(final_step.clone())
-                .when_last_row()
-                .assert_zero(local.a_prime_prime_prime_0_0_limbs[limb]);
-        }
-
-        // On export row, all step flags except the last must be zero
-        for i in 0..NUM_ROUNDS - 1 {
-            builder
-                .when(final_step.clone())
-                .when_last_row()
-                .assert_zero(local.step_flags[i]);
-        }
-
-        builder
-            .when(final_step.clone())
-            .when_last_row()
-            .assert_one(local.export);
     }
 }

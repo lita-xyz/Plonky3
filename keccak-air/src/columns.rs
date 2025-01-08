@@ -20,17 +20,6 @@ pub struct KeccakCols<T> {
     /// The `i`th value is set to 1 if we are in the `i`th round, otherwise 0.
     pub step_flags: [T; NUM_ROUNDS],
 
-    /// A register which indicates if a row should be exported, i.e. included in a multiset equality
-    /// argument. Should be 1 only for certain rows which are final steps, i.e. with
-    /// `step_flags[23] = 1`.
-    pub export: T,
-
-    /// Permutation inputs, stored in y-major order.
-    pub preimage: [[[T; U64_LIMBS]; 5]; 5],
-
-    /// Permutation outputs, stored in y-major order.
-    pub postimage: [[[T; U64_LIMBS]; 5]; 5],
-
     pub a: [[[T; U64_LIMBS]; 5]; 5],
 
     /// ```ignore
@@ -68,9 +57,6 @@ impl<T: Default> Default for KeccakCols<T> {
     fn default() -> Self {
         Self {
             step_flags: array::from_fn(|_| T::default()),
-            export: T::default(),
-            preimage: array::from_fn(|_| array::from_fn(|_| array::from_fn(|_| T::default()))),
-            postimage: array::from_fn(|_| array::from_fn(|_| array::from_fn(|_| T::default()))),
             a: array::from_fn(|_| array::from_fn(|_| array::from_fn(|_| T::default()))),
             c: array::from_fn(|_| array::from_fn(|_| T::default())),
             c_prime: array::from_fn(|_| array::from_fn(|_| T::default())),
@@ -86,9 +72,6 @@ impl<T: Debug> Debug for KeccakCols<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         f.debug_struct("KeccakCols")
             .field("step_flags", &self.step_flags)
-            .field("export", &self.export)
-            .field("preimage", &self.preimage)
-            .field("postimage", &self.postimage)
             .field("a", &self.a)
             .field("c", &self.c)
             .field("c_prime", &self.c_prime)
@@ -133,8 +116,6 @@ impl<T: Copy> KeccakCols<T> {
 }
 
 pub fn input_limb(i: usize) -> usize {
-    debug_assert!(i < RATE_LIMBS);
-
     let i_u64 = i / U64_LIMBS;
     let limb_index = i % U64_LIMBS;
 
@@ -142,12 +123,10 @@ pub fn input_limb(i: usize) -> usize {
     let y = i_u64 / 5;
     let x = i_u64 % 5;
 
-    KECCAK_COL_MAP.preimage[y][x][limb_index]
+    KECCAK_COL_MAP.a[y][x][limb_index]
 }
 
 pub fn output_limb(i: usize) -> usize {
-    debug_assert!(i < RATE_LIMBS);
-
     let i_u64 = i / U64_LIMBS;
     let limb_index = i % U64_LIMBS;
 
@@ -155,7 +134,7 @@ pub fn output_limb(i: usize) -> usize {
     let y = i_u64 / 5;
     let x = i_u64 % 5;
 
-    KECCAK_COL_MAP.postimage[y][x][limb_index]
+    KECCAK_COL_MAP.a_prime_prime_prime(y, x, limb_index)
 }
 
 pub(crate) const NUM_KECCAK_COLS: usize = size_of::<KeccakCols<u8>>();
