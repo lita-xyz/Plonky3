@@ -115,6 +115,21 @@ impl<T: Copy> KeccakCols<T> {
     }
 }
 
+impl<T: Clone> Clone for KeccakCols<T> {
+    fn clone(&self) -> Self {
+        Self {
+            step_flags: self.step_flags.clone(),
+            a: self.a.clone(),
+            c: self.c.clone(),
+            c_prime: self.c_prime.clone(),
+            a_prime: self.a_prime.clone(),
+            a_prime_prime: self.a_prime_prime.clone(),
+            a_prime_prime_0_0_bits: self.a_prime_prime_0_0_bits.clone(),
+            a_prime_prime_prime_0_0_limbs: self.a_prime_prime_prime_0_0_limbs.clone(),
+        }
+    }
+}
+
 pub fn input_limb(i: usize) -> usize {
     let i_u64 = i / U64_LIMBS;
     let limb_index = i % U64_LIMBS;
