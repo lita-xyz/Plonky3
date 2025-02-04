@@ -15,7 +15,7 @@ impl<'a, T> TwoRowMatrixView<'a, T> {
     }
 }
 
-impl<'a, T> Matrix<T> for TwoRowMatrixView<'a, T> {
+impl<T> Matrix<T> for TwoRowMatrixView<'_, T> {
     fn width(&self) -> usize {
         self.local.len()
     }
