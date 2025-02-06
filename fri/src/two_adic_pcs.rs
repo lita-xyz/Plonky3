@@ -288,6 +288,7 @@ where
             .par_iter()
             .map(|(data, points)| {
                 let mats = self.mmcs.get_matrices(data);
+                debug_assert_eq!(mats.len(), points.len());
                 izip!(mats, (*points).clone())
                     .collect::<Vec<_>>()
                     .par_iter()

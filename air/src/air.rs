@@ -168,7 +168,7 @@ pub struct FilteredAirBuilder<'a, AB: AirBuilder> {
     condition: AB::Expr,
 }
 
-impl<'a, AB: AirBuilder> AirBuilder for FilteredAirBuilder<'a, AB> {
+impl<AB: AirBuilder> AirBuilder for FilteredAirBuilder<'_, AB> {
     type F = AB::F;
     type Expr = AB::Expr;
     type Var = AB::Var;
@@ -195,7 +195,7 @@ impl<'a, AB: AirBuilder> AirBuilder for FilteredAirBuilder<'a, AB> {
     }
 }
 
-impl<'a, AB: ExtensionBuilder> ExtensionBuilder for FilteredAirBuilder<'a, AB> {
+impl<AB: ExtensionBuilder> ExtensionBuilder for FilteredAirBuilder<'_, AB> {
     type EF = AB::EF;
     type VarEF = AB::VarEF;
     type ExprEF = AB::ExprEF;
@@ -209,7 +209,7 @@ impl<'a, AB: ExtensionBuilder> ExtensionBuilder for FilteredAirBuilder<'a, AB> {
     }
 }
 
-impl<'a, AB: PermutationAirBuilder> PermutationAirBuilder for FilteredAirBuilder<'a, AB> {
+impl<AB: PermutationAirBuilder> PermutationAirBuilder for FilteredAirBuilder<'_, AB> {
     type MP = AB::MP;
 
     fn permutation(&self) -> Self::MP {
