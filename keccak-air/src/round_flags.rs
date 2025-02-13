@@ -11,6 +11,7 @@ pub(crate) fn eval_round_flags<AB: AirBuilder>(builder: &mut AB) {
     let local: &KeccakCols<AB::Var> = main.row_slice(0).borrow();
     let next: &KeccakCols<AB::Var> = main.row_slice(1).borrow();
 
+
     // Initially, the first step flag should be 1 while the others should be 0.
     builder.when_first_row().assert_one(local.step_flags[0]);
     for i in 1..NUM_ROUNDS {
