@@ -25,25 +25,26 @@ use crate::verifier::{self, FriError};
 use crate::{prover, FriConfig, FriProof};
 
 /// We group all of our type bounds into this trait to reduce duplication across signatures.
-pub trait TwoAdicFriPcsGenericConfig: Default {
-    type Val: TwoAdicField;
-    type Challenge: TwoAdicField + ExtensionField<Self::Val>;
+pub trait TwoAdicFriPcsGenericConfig: Default + Send + Sync {
+    type Val: TwoAdicField + Send + Sync;
+    type Challenge: TwoAdicField + ExtensionField<Self::Val> + Send + Sync;
     type Challenger: FieldChallenger<Self::Val>
-        + GrindingChallenger<Witness = Self::Val>
-        + CanObserve<<Self::FriMmcs as Mmcs<Self::Challenge>>::Commitment>
-        + CanSample<Self::Challenge>;
-    type Dft: TwoAdicSubgroupDft<Self::Val> + Sync;
+    + GrindingChallenger<Witness = Self::Val>
+    + CanObserve<<Self::FriMmcs as Mmcs<Self::Challenge>>::Commitment>
+    + CanSample<Self::Challenge>
+    + Send + Sync;
+    type Dft: TwoAdicSubgroupDft<Self::Val> + Send + Sync;
     type InputMmcs: 'static
-        + for<'a> DirectMmcs<Self::Val, Mat<'a> = RowMajorMatrixView<'a, Self::Val>>
-        + Sync;
-    type FriMmcs: DirectMmcs<Self::Challenge> + Sync;
+    + for<'a> DirectMmcs<Self::Val, Mat<'a> = RowMajorMatrixView<'a, Self::Val>>
+    + Send + Sync;
+    type FriMmcs: DirectMmcs<Self::Challenge> + Send + Sync;
 }
 
 pub struct TwoAdicFriPcsConfig<Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs>(
     PhantomData<(Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs)>,
 );
 impl<Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs> Default
-    for TwoAdicFriPcsConfig<Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs>
+for TwoAdicFriPcsConfig<Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs>
 {
     fn default() -> Self {
         Self(PhantomData)
@@ -51,17 +52,18 @@ impl<Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs> Default
 }
 
 impl<Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs> TwoAdicFriPcsGenericConfig
-    for TwoAdicFriPcsConfig<Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs>
+for TwoAdicFriPcsConfig<Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs>
 where
-    Val: TwoAdicField,
-    Challenge: TwoAdicField + ExtensionField<Val>,
+    Val: TwoAdicField  + Send + Sync,
+    Challenge: TwoAdicField + ExtensionField<Val> + Send + Sync,
     Challenger: FieldChallenger<Val>
-        + GrindingChallenger<Witness = Val>
-        + CanObserve<<FriMmcs as Mmcs<Challenge>>::Commitment>
-        + CanSample<Challenge>,
-    Dft: TwoAdicSubgroupDft<Val> + Sync,
-    InputMmcs: 'static + for<'a> DirectMmcs<Val, Mat<'a> = RowMajorMatrixView<'a, Val>> + Sync,
-    FriMmcs: DirectMmcs<Challenge> + Sync,
+    + GrindingChallenger<Witness = Val>
+    + CanObserve<<FriMmcs as Mmcs<Challenge>>::Commitment>
+    + CanSample<Challenge>
+    + Send + Sync,
+    Dft: TwoAdicSubgroupDft<Val> + Send + Sync,
+    InputMmcs: 'static + for<'a> DirectMmcs<Val, Mat<'a> = RowMajorMatrixView<'a, Val>> + Send + Sync,
+    FriMmcs: DirectMmcs<Challenge> + Send + Sync,
 {
     type Val = Val;
     type Challenge = Challenge;
@@ -77,7 +79,11 @@ pub struct TwoAdicFriPcs<C: TwoAdicFriPcsGenericConfig> {
     mmcs: C::InputMmcs,
 }
 
-impl<C: TwoAdicFriPcsGenericConfig> TwoAdicFriPcs<C> {
+impl<C: TwoAdicFriPcsGenericConfig> TwoAdicFriPcs<C>
+where
+    <C::FriMmcs as Mmcs<C::Challenge>>::Commitment: Send + Sync,
+    <C::FriMmcs as Mmcs<C::Challenge>>::Proof: Send + Sync,
+{
     pub fn new(fri: FriConfig<C::FriMmcs>, dft: C::Dft, mmcs: C::InputMmcs) -> Self {
         Self { fri, dft, mmcs }
     }
@@ -88,7 +94,11 @@ pub enum VerificationError<C: TwoAdicFriPcsGenericConfig> {
     FriError(FriError<<C::FriMmcs as Mmcs<C::Challenge>>::Error>),
 }
 
-impl<C: TwoAdicFriPcsGenericConfig> Debug for VerificationError<C> {
+impl<C: TwoAdicFriPcsGenericConfig> Debug for VerificationError<C>
+where
+    <C::FriMmcs as Mmcs<C::Challenge>>::Commitment: Send + Sync,
+    <C::FriMmcs as Mmcs<C::Challenge>>::Proof: Send + Sync,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
             VerificationError::InputMmcsError(e) => {
@@ -101,11 +111,36 @@ impl<C: TwoAdicFriPcsGenericConfig> Debug for VerificationError<C> {
 
 #[derive(Serialize, Deserialize)]
 #[serde(bound = "")]
-pub struct TwoAdicFriPcsProof<C: TwoAdicFriPcsGenericConfig> {
+pub struct TwoAdicFriPcsProof<C: TwoAdicFriPcsGenericConfig>
+where
+    <C::FriMmcs as Mmcs<C::Challenge>>::Commitment: Send + Sync,
+    <C::FriMmcs as Mmcs<C::Challenge>>::Proof: Send + Sync,
+    <C::InputMmcs as Mmcs<C::Val>>::Proof: Send + Sync,
+{
     pub(crate) fri_proof: FriProof<C::Challenge, C::FriMmcs, C::Val>,
     /// For each query, for each committed batch, query openings for that batch
     pub(crate) query_openings: Vec<Vec<BatchOpening<C>>>,
 }
+
+unsafe impl<C: TwoAdicFriPcsGenericConfig> Send for TwoAdicFriPcsProof<C>
+where
+    C: Send + Sync,
+    C::Challenge: Send + Sync,
+    C::Val: Send + Sync,
+    <C::FriMmcs as Mmcs<C::Challenge>>::Commitment: Send + Sync,
+    <C::FriMmcs as Mmcs<C::Challenge>>::Proof: Send + Sync,
+    <C::InputMmcs as Mmcs<C::Val>>::Proof: Send + Sync,
+{}
+
+unsafe impl<C: TwoAdicFriPcsGenericConfig> Sync for TwoAdicFriPcsProof<C>
+where
+    C: Send + Sync,
+    C::Challenge: Send + Sync,
+    C::Val: Send + Sync,
+    <C::FriMmcs as Mmcs<C::Challenge>>::Commitment: Send + Sync,
+    <C::FriMmcs as Mmcs<C::Challenge>>::Proof: Send + Sync,
+    <C::InputMmcs as Mmcs<C::Val>>::Proof: Send + Sync,
+{}
 
 #[derive(Serialize, Deserialize)]
 pub struct BatchOpening<C: TwoAdicFriPcsGenericConfig> {
@@ -113,12 +148,26 @@ pub struct BatchOpening<C: TwoAdicFriPcsGenericConfig> {
     pub(crate) opening_proof: <C::InputMmcs as Mmcs<C::Val>>::Proof,
 }
 
+unsafe impl<C: TwoAdicFriPcsGenericConfig> Send for BatchOpening<C>
+where
+    C::Val: Send + Sync,
+    <C::InputMmcs as Mmcs<C::Val>>::Proof: Send + Sync,
+{}
+
+unsafe impl<C: TwoAdicFriPcsGenericConfig> Sync for BatchOpening<C>
+where
+    C::Val: Send + Sync,
+    <C::InputMmcs as Mmcs<C::Val>>::Proof: Send + Sync,
+{}
+
 impl<C: TwoAdicFriPcsGenericConfig, In: MatrixRows<C::Val> + Sized + Sync + Clone> Pcs<C::Val, In>
-    for TwoAdicFriPcs<C>
+for TwoAdicFriPcs<C>
 where
     C::FriMmcs: Send,
-    <C::FriMmcs as Mmcs<C::Challenge>>::Proof: Send,
+    <C::FriMmcs as Mmcs<C::Challenge>>::Commitment: Send + Sync,
+    <C::FriMmcs as Mmcs<C::Challenge>>::Proof: Send + Sync,
     <C::FriMmcs as Mmcs<C::Challenge>>::ProverData: Send + Sync,
+    <C::InputMmcs as Mmcs<C::Val>>::Proof: Send + Sync,
     <C::InputMmcs as Mmcs<C::Val>>::ProverData: Send + Sync + Sized,
 {
     type Commitment = <C::InputMmcs as Mmcs<C::Val>>::Commitment;
@@ -133,15 +182,17 @@ where
 }
 
 impl<C: TwoAdicFriPcsGenericConfig, In: MatrixRows<C::Val> + Sized + Sync + Clone>
-    UnivariatePcsWithLde<C::Val, C::Challenge, In, C::Challenger> for TwoAdicFriPcs<C>
+UnivariatePcsWithLde<C::Val, C::Challenge, In, C::Challenger> for TwoAdicFriPcs<C>
 where
     C::FriMmcs: Send,
-    <C::FriMmcs as Mmcs<C::Challenge>>::Proof: Send,
+    <C::FriMmcs as Mmcs<C::Challenge>>::Commitment: Send + Sync,
+    <C::FriMmcs as Mmcs<C::Challenge>>::Proof: Send + Sync,
     <C::FriMmcs as Mmcs<C::Challenge>>::ProverData: Send + Sync,
+    <C::InputMmcs as Mmcs<C::Val>>::Proof: Send + Sync,
     <C::InputMmcs as Mmcs<C::Val>>::ProverData: Send + Sync + Sized,
 {
     type Lde<'a>
-        = BitReversedMatrixView<<C::InputMmcs as Mmcs<C::Val>>::Mat<'a>>
+    = BitReversedMatrixView<<C::InputMmcs as Mmcs<C::Val>>::Mat<'a>>
     where
         Self: 'a;
 
@@ -201,11 +252,13 @@ where
 }
 
 impl<C: TwoAdicFriPcsGenericConfig, In: MatrixRows<C::Val> + Sync + Clone>
-    UnivariatePcs<C::Val, C::Challenge, In, C::Challenger> for TwoAdicFriPcs<C>
+UnivariatePcs<C::Val, C::Challenge, In, C::Challenger> for TwoAdicFriPcs<C>
 where
     C::FriMmcs: Send,
-    <C::FriMmcs as Mmcs<C::Challenge>>::Proof: Send,
+    <C::FriMmcs as Mmcs<C::Challenge>>::Commitment: Send + Sync,
+    <C::FriMmcs as Mmcs<C::Challenge>>::Proof: Send + Sync,
     <C::FriMmcs as Mmcs<C::Challenge>>::ProverData: Send + Sync,
+    <C::InputMmcs as Mmcs<C::Val>>::Proof: Send + Sync,
     <C::InputMmcs as Mmcs<C::Val>>::ProverData: Send + Sync + Sized,
     C::Challenge: Send + Sync + Sized,
 {
@@ -442,7 +495,7 @@ where
 
                         let x = C::Val::generator()
                             * C::Val::two_adic_generator(log_height)
-                                .exp_u64(rev_reduced_index as u64);
+                            .exp_u64(rev_reduced_index as u64);
 
                         for (&z, ps_at_z) in izip!(mat_points, mat_at_z) {
                             for (&p_at_x, &p_at_z) in izip!(mat_opening, ps_at_z) {
@@ -464,7 +517,7 @@ where
             &fri_challenges,
             &reduced_openings,
         )
-        .map_err(VerificationError::FriError)?;
+            .map_err(VerificationError::FriError)?;
 
         Ok(())
     }
@@ -496,7 +549,7 @@ fn compute_inverse_denominators<F: TwoAdicField, EF: ExtensionField<F>, M: Matri
         coset_shift,
         1 << max_log_height,
     )
-    .collect_vec();
+        .collect_vec();
     reverse_slice_index_bits(&mut subgroup);
 
     max_log_height_for_point
@@ -535,7 +588,7 @@ impl<F: Field, EF: ExtensionField<F>> PowersReducer<F, EF> {
                     F::Packing::pack_slice(
                         &powers.iter().map(|a| a.as_base_slice()[d]).collect_vec(),
                     )
-                    .to_vec()
+                        .to_vec()
                 })
                 .collect(),
         );

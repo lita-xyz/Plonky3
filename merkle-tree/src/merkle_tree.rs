@@ -26,6 +26,15 @@ pub struct FieldMerkleTree<F: Field, const DIGEST_ELEMS: usize> {
     pub(crate) digest_layers: Vec<Vec<[F; DIGEST_ELEMS]>>,
 }
 
+unsafe impl<F: Field + Send + Sync, const DIGEST_ELEMS: usize> Send
+    for FieldMerkleTree<F, DIGEST_ELEMS>
+{
+}
+unsafe impl<F: Field + Send + Sync, const DIGEST_ELEMS: usize> Sync
+    for FieldMerkleTree<F, DIGEST_ELEMS>
+{
+}
+
 impl<F: Field, const DIGEST_ELEMS: usize> FieldMerkleTree<F, DIGEST_ELEMS> {
     /// Matrix heights need not be powers of two. However, if the heights of two given matrices
     /// round up to the same power of two, they must be equal.
