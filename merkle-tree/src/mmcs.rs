@@ -26,6 +26,21 @@ pub struct FieldMerkleTreeMmcs<P, H, C, const DIGEST_ELEMS: usize> {
     _phantom: PhantomData<P>,
 }
 
+impl<P, H, C, const DIGEST_ELEMS: usize> Default for FieldMerkleTreeMmcs<P, H, C, DIGEST_ELEMS>
+where
+    P: PackedField,
+    H: CryptographicHasher<P, [P; DIGEST_ELEMS]> + Default,
+    C: PseudoCompressionFunction<[P; DIGEST_ELEMS], 2> + Default,
+{
+    fn default() -> Self {
+        Self {
+            hash: H::default(),
+            compress: C::default(),
+            _phantom: PhantomData,
+        }
+    }
+}
+
 impl<P, H, C, const DIGEST_ELEMS: usize> FieldMerkleTreeMmcs<P, H, C, DIGEST_ELEMS> {
     pub fn new(hash: H, compress: C) -> Self {
         Self {

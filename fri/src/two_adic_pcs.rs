@@ -33,37 +33,32 @@ pub trait TwoAdicFriPcsGenericConfig: Default + Send + Sync {
     + CanObserve<<Self::FriMmcs as Mmcs<Self::Challenge>>::Commitment>
     + CanSample<Self::Challenge>
     + Send + Sync;
-    type Dft: TwoAdicSubgroupDft<Self::Val> + Send + Sync;
+    type Dft: TwoAdicSubgroupDft<Self::Val> + Send + Sync + Clone;
     type InputMmcs: 'static
     + for<'a> DirectMmcs<Self::Val, Mat<'a> = RowMajorMatrixView<'a, Self::Val>>
-    + Send + Sync;
-    type FriMmcs: DirectMmcs<Self::Challenge> + Send + Sync;
+    + Send + Sync + Clone;
+    type FriMmcs: DirectMmcs<Self::Challenge> + Send + Sync + Clone;
 }
 
+#[derive(Default)]  // Keep Default
 pub struct TwoAdicFriPcsConfig<Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs>(
     PhantomData<(Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs)>,
 );
-impl<Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs> Default
-for TwoAdicFriPcsConfig<Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs>
-{
-    fn default() -> Self {
-        Self(PhantomData)
-    }
-}
 
 impl<Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs> TwoAdicFriPcsGenericConfig
 for TwoAdicFriPcsConfig<Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs>
 where
-    Val: TwoAdicField  + Send + Sync,
+    Val: TwoAdicField + Send + Sync,
     Challenge: TwoAdicField + ExtensionField<Val> + Send + Sync,
     Challenger: FieldChallenger<Val>
     + GrindingChallenger<Witness = Val>
     + CanObserve<<FriMmcs as Mmcs<Challenge>>::Commitment>
     + CanSample<Challenge>
-    + Send + Sync,
-    Dft: TwoAdicSubgroupDft<Val> + Send + Sync,
-    InputMmcs: 'static + for<'a> DirectMmcs<Val, Mat<'a> = RowMajorMatrixView<'a, Val>> + Send + Sync,
-    FriMmcs: DirectMmcs<Challenge> + Send + Sync,
+    + Send + Sync
+    + Default,
+    Dft: TwoAdicSubgroupDft<Val> + Send + Sync + Clone,
+    InputMmcs: 'static + for<'a> DirectMmcs<Val, Mat<'a> = RowMajorMatrixView<'a, Val>> + Send + Sync + Clone + Default,
+    FriMmcs: DirectMmcs<Challenge> + Send + Sync + Clone + Default,
 {
     type Val = Val;
     type Challenge = Challenge;
@@ -73,12 +68,12 @@ where
     type FriMmcs = FriMmcs;
 }
 
+#[derive(Clone, Default)]  // Add Clone derive
 pub struct TwoAdicFriPcs<C: TwoAdicFriPcsGenericConfig> {
     fri: FriConfig<C::FriMmcs>,
     dft: C::Dft,
     mmcs: C::InputMmcs,
 }
-
 impl<C: TwoAdicFriPcsGenericConfig> TwoAdicFriPcs<C>
 where
     <C::FriMmcs as Mmcs<C::Challenge>>::Commitment: Send + Sync,

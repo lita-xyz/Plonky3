@@ -18,6 +18,21 @@ where
     permutation: P,
 }
 
+impl<F, P, const WIDTH: usize> Default for DuplexChallenger<F, P, WIDTH>
+where
+    F: Field,
+    P: CryptographicPermutation<[F; WIDTH]> + Default,
+{
+    fn default() -> Self {
+        Self {
+            sponge_state: [F::zero(); WIDTH],
+            input_buffer: Vec::new(),
+            output_buffer: Vec::new(),
+            permutation: P::default(),
+        }
+    }
+}
+
 impl<F, P, const WIDTH: usize> DuplexChallenger<F, P, WIDTH>
 where
     F: Copy,

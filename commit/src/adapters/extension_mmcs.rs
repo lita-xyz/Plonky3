@@ -13,6 +13,20 @@ pub struct ExtensionMmcs<F, EF, InnerMmcs> {
     _phantom: PhantomData<(F, EF)>,
 }
 
+impl<F, EF, InnerMmcs> Default for ExtensionMmcs<F, EF, InnerMmcs>
+where
+    F: Field,
+    EF: ExtensionField<F>,
+    InnerMmcs: Mmcs<F> + Default,
+{
+    fn default() -> Self {
+        Self {
+            inner: InnerMmcs::default(),
+            _phantom: PhantomData::<(F, EF)>,
+        }
+    }
+}
+
 impl<F, EF, InnerMmcs> ExtensionMmcs<F, EF, InnerMmcs> {
     pub fn new(inner: InnerMmcs) -> Self {
         Self {
