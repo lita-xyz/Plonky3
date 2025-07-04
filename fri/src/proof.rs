@@ -18,6 +18,8 @@ where
 {
     pub(crate) commit_phase_commits: Vec<M::Commitment>,
     pub(crate) query_proofs: Vec<QueryProof<F, M>>,
+    // This could become Vec<FC::Challenge> if this library was generalized to support non-constant
+    // final polynomials.
     pub(crate) final_poly: F,
     pub(crate) pow_witness: Witness,
 }
@@ -58,11 +60,15 @@ unsafe impl<F: Field + Send + Sync, M: Mmcs<F>> Sync for QueryProof<F, M> where 
 // #[serde(bound(serialize = "F: Serialize"))]
 #[serde(bound = "")]
 pub struct CommitPhaseProofStep<F: Field, M: Mmcs<F>>
+/// The opening of the commit phase codeword at the sibling location.
+// This may change to Vec<FC::Challenge> if the library is generalized to support other FRI
+// folding arities besides 2, meaning that there can be multiple siblings.
 where
     F: Send + Sync,
     M::Proof: Send + Sync,
 {
     pub(crate) sibling_value: F,
+
     pub(crate) opening_proof: M::Proof,
 }
 

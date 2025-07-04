@@ -40,7 +40,7 @@ pub trait TwoAdicFriPcsGenericConfig: Default + Send + Sync {
     type FriMmcs: DirectMmcs<Self::Challenge> + Send + Sync + Clone;
 }
 
-#[derive(Default)]  // Keep Default
+#[derive(Default)]
 pub struct TwoAdicFriPcsConfig<Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs>(
     PhantomData<(Val, Challenge, Challenger, Dft, InputMmcs, FriMmcs)>,
 );
@@ -68,7 +68,7 @@ where
     type FriMmcs = FriMmcs;
 }
 
-#[derive(Clone, Default)]  // Add Clone derive
+#[derive(Clone, Default)]
 pub struct TwoAdicFriPcs<C: TwoAdicFriPcsGenericConfig> {
     fri: FriConfig<C::FriMmcs>,
     dft: C::Dft,
