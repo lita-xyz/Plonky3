@@ -40,6 +40,8 @@ where
 {
 }
 
+/// For each commit phase commitment, this contains openings of a commit phase codeword at the
+/// queried location, along with an opening proof.
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(bound = "")]
 pub struct QueryProof<F: Field, M: Mmcs<F>>
@@ -56,13 +58,13 @@ unsafe impl<F: Field + Send + Sync, M: Mmcs<F>> Send for QueryProof<F, M> where 
 unsafe impl<F: Field + Send + Sync, M: Mmcs<F>> Sync for QueryProof<F, M> where M::Proof: Send + Sync
 {}
 
+// The opening of the commit phase codeword at the sibling location.
+// This may change to Vec<FC::Challenge> if the library is generalized to support other FRI
+// folding arities besides 2, meaning that there can be multiple siblings.
 #[derive(Serialize, Deserialize, Clone)]
 // #[serde(bound(serialize = "F: Serialize"))]
 #[serde(bound = "")]
 pub struct CommitPhaseProofStep<F: Field, M: Mmcs<F>>
-// The opening of the commit phase codeword at the sibling location.
-// This may change to Vec<FC::Challenge> if the library is generalized to support other FRI
-// folding arities besides 2, meaning that there can be multiple siblings.
 where
     F: Send + Sync,
     M::Proof: Send + Sync,
