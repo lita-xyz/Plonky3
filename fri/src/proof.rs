@@ -4,7 +4,7 @@ use p3_commit::Mmcs;
 use p3_field::Field;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(bound(
     serialize = "Witness: Serialize",
     deserialize = "Witness: Deserialize<'de>"
@@ -40,7 +40,7 @@ where
 {
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(bound = "")]
 pub struct QueryProof<F: Field, M: Mmcs<F>>
 where
@@ -56,11 +56,11 @@ unsafe impl<F: Field + Send + Sync, M: Mmcs<F>> Send for QueryProof<F, M> where 
 unsafe impl<F: Field + Send + Sync, M: Mmcs<F>> Sync for QueryProof<F, M> where M::Proof: Send + Sync
 {}
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 // #[serde(bound(serialize = "F: Serialize"))]
 #[serde(bound = "")]
 pub struct CommitPhaseProofStep<F: Field, M: Mmcs<F>>
-/// The opening of the commit phase codeword at the sibling location.
+// The opening of the commit phase codeword at the sibling location.
 // This may change to Vec<FC::Challenge> if the library is generalized to support other FRI
 // folding arities besides 2, meaning that there can be multiple siblings.
 where

@@ -20,9 +20,9 @@ use serde::Serialize;
 /// matrices. Other MMCSs may be virtual combinations of child MMCSs, or may be constructed in a
 /// streaming manner.
 pub trait Mmcs<T>: Clone {
-    type ProverData;
+    type ProverData: Clone;
     type Commitment: Clone + Serialize + DeserializeOwned;
-    type Proof: Serialize + DeserializeOwned;
+    type Proof: Serialize + DeserializeOwned + Clone;
     type Error: Debug;
     type Mat<'a>: MatrixRows<T> + Sync
     where
