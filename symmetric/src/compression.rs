@@ -18,6 +18,16 @@ pub struct TruncatedPermutation<InnerP, const N: usize, const CHUNK: usize, cons
     inner_permutation: InnerP,
 }
 
+unsafe impl<InnerP: Send, const N: usize, const CHUNK: usize, const WIDTH: usize> Send
+    for TruncatedPermutation<InnerP, N, CHUNK, WIDTH>
+{
+}
+
+unsafe impl<InnerP: Sync, const N: usize, const CHUNK: usize, const WIDTH: usize> Sync
+    for TruncatedPermutation<InnerP, N, CHUNK, WIDTH>
+{
+}
+
 impl<InnerP, const N: usize, const CHUNK: usize, const WIDTH: usize>
     TruncatedPermutation<InnerP, N, CHUNK, WIDTH>
 {

@@ -11,6 +11,16 @@ pub struct PaddingFreeSponge<P, const WIDTH: usize, const RATE: usize, const OUT
     permutation: P,
 }
 
+unsafe impl<P: Send, const WIDTH: usize, const RATE: usize, const OUT: usize> Send
+    for PaddingFreeSponge<P, WIDTH, RATE, OUT>
+{
+}
+
+unsafe impl<P: Sync, const WIDTH: usize, const RATE: usize, const OUT: usize> Sync
+    for PaddingFreeSponge<P, WIDTH, RATE, OUT>
+{
+}
+
 impl<P, const WIDTH: usize, const RATE: usize, const OUT: usize>
     PaddingFreeSponge<P, WIDTH, RATE, OUT>
 {

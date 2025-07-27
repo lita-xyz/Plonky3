@@ -42,6 +42,16 @@ pub struct Poseidon2<F, Diffusion, const WIDTH: usize, const D: u64> {
     internal_linear_layer: Diffusion,
 }
 
+unsafe impl<F: Send, Diffusion: Send, const WIDTH: usize, const D: u64> Send
+    for Poseidon2<F, Diffusion, WIDTH, D>
+{
+}
+
+unsafe impl<F: Sync, Diffusion: Sync, const WIDTH: usize, const D: u64> Sync
+    for Poseidon2<F, Diffusion, WIDTH, D>
+{
+}
+
 impl<F, Diffusion, const WIDTH: usize, const D: u64> Poseidon2<F, Diffusion, WIDTH, D>
 where
     F: PrimeField,
