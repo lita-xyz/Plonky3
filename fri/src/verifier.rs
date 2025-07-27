@@ -159,7 +159,7 @@ where
         x = x.square();
     }
 
-    debug_assert!(index < config.blowup(), "index was {}", index);
+    debug_assert!(index < config.blowup(), "index was {index}");
     debug_assert_eq!(x.exp_power_of_2(config.log_blowup), F::one());
 
     Ok(folded_eval)
