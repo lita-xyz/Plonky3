@@ -22,10 +22,10 @@ pub trait Pcs<Val: Field, In: MatrixRows<Val>> {
     type Commitment: Clone + Serialize + DeserializeOwned;
 
     /// Data that the prover stores for committed polynomials, to help the prover with opening.
-    type ProverData;
+    type ProverData: Clone;
 
     /// The opening argument.
-    type Proof: Serialize + DeserializeOwned;
+    type Proof: Serialize + DeserializeOwned + Clone;
 
     type Error: Debug;
 

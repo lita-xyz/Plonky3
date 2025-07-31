@@ -91,10 +91,10 @@ where
     P: PackedField,
     H: CryptographicHasher<P::Scalar, [P::Scalar; DIGEST_ELEMS]>,
     H: CryptographicHasher<P, [P; DIGEST_ELEMS]>,
-    H: Sync,
+    H: Send + Sync,
     C: PseudoCompressionFunction<[P::Scalar; DIGEST_ELEMS], 2>,
     C: PseudoCompressionFunction<[P; DIGEST_ELEMS], 2>,
-    C: Sync,
+    C: Send + Sync,
     [P::Scalar; DIGEST_ELEMS]: Serialize + DeserializeOwned,
     Standard: Distribution<P::Scalar>,
 {

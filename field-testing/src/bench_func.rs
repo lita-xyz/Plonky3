@@ -13,7 +13,7 @@ where
 {
     let mut rng = rand::thread_rng();
     let x = rng.gen::<F>();
-    c.bench_function(&format!("{} square", name), |b| {
+    c.bench_function(&format!("{name} square"), |b| {
         b.iter(|| black_box(black_box(x).square()))
     });
 }
@@ -24,7 +24,7 @@ where
 {
     let mut rng = rand::thread_rng();
     let x = rng.gen::<F>();
-    c.bench_function(&format!("{} inv", name), |b| {
+    c.bench_function(&format!("{name} inv"), |b| {
         b.iter(|| black_box(black_box(x)).inverse())
     });
 }
@@ -36,7 +36,7 @@ where
     let mut rng = rand::thread_rng();
     let x = rng.gen::<F>();
     let y = rng.gen::<F>();
-    c.bench_function(&format!("{} mul", name), |b| {
+    c.bench_function(&format!("{name} mul"), |b| {
         b.iter(|| black_box(black_box(x) * black_box(y)))
     });
 }
@@ -55,7 +55,7 @@ pub fn benchmark_iter_sum<F: Field, const N: usize, const REPS: usize>(
         input.push(rng.gen::<[F; N]>())
     }
     let mut output = [F::zero(); REPS];
-    c.bench_function(&format!("{} sum/{}, {}", name, REPS, N), |b| {
+    c.bench_function(&format!("{name} sum/{REPS}, {N}"), |b| {
         b.iter(|| {
             for i in 0..REPS {
                 output[i] = input[i].iter().cloned().sum()
@@ -69,7 +69,7 @@ pub fn benchmark_add_latency<F: Field, const N: usize>(c: &mut Criterion, name: 
 where
     Standard: Distribution<F>,
 {
-    c.bench_function(&format!("{} add-latency/{}", name, N), |b| {
+    c.bench_function(&format!("{name} add-latency/{N}"), |b| {
         b.iter_batched(
             || {
                 let mut rng = rand::thread_rng();
@@ -89,7 +89,7 @@ pub fn benchmark_add_throughput<F: Field, const N: usize>(c: &mut Criterion, nam
 where
     Standard: Distribution<F>,
 {
-    c.bench_function(&format!("{} add-throughput/{}", name, N), |b| {
+    c.bench_function(&format!("{name} add-throughput/{N}"), |b| {
         b.iter_batched(
             || {
                 let mut rng = rand::thread_rng();
@@ -132,7 +132,7 @@ pub fn benchmark_sub_latency<F: Field, const N: usize>(c: &mut Criterion, name: 
 where
     Standard: Distribution<F>,
 {
-    c.bench_function(&format!("{} sub-latency/{}", name, N), |b| {
+    c.bench_function(&format!("{name} sub-latency/{N}"), |b| {
         b.iter_batched(
             || {
                 let mut rng = rand::thread_rng();
@@ -152,7 +152,7 @@ pub fn benchmark_sub_throughput<F: Field, const N: usize>(c: &mut Criterion, nam
 where
     Standard: Distribution<F>,
 {
-    c.bench_function(&format!("{} sub-throughput/{}", name, N), |b| {
+    c.bench_function(&format!("{name} sub-throughput/{N}"), |b| {
         b.iter_batched(
             || {
                 let mut rng = rand::thread_rng();

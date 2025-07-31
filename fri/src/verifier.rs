@@ -32,7 +32,10 @@ pub fn verify_shape_and_sample_challenges<F, M, Challenger>(
 where
     F: Field,
     M: Mmcs<F>,
+    M::Commitment: Send + Sync,
+    M::Proof: Send + Sync,
     Challenger: GrindingChallenger + CanObserve<M::Commitment> + CanSample<F>,
+    Challenger::Witness: Send + Sync,
 {
     let betas: Vec<F> = proof
         .commit_phase_commits
@@ -73,6 +76,9 @@ pub fn verify_challenges<F, M, Witness>(
 where
     F: TwoAdicField,
     M: Mmcs<F>,
+    M::Commitment: Send + Sync,
+    M::Proof: Send + Sync,
+    Witness: Send + Sync,
 {
     let log_max_height = proof.commit_phase_commits.len() + config.log_blowup;
     for (&index, query_proof, ro) in izip!(
@@ -109,6 +115,7 @@ fn verify_query<F, M>(
 where
     F: TwoAdicField,
     M: Mmcs<F>,
+    M::Proof: Send + Sync,
 {
     let mut folded_eval = F::zero();
     let mut x = F::two_adic_generator(log_max_height)
@@ -152,7 +159,7 @@ where
         x = x.square();
     }
 
-    debug_assert!(index < config.blowup(), "index was {}", index);
+    debug_assert!(index < config.blowup(), "index was {index}");
     debug_assert_eq!(x.exp_power_of_2(config.log_blowup), F::one());
 
     Ok(folded_eval)

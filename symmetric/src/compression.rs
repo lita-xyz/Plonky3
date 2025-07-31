@@ -13,9 +13,19 @@ pub trait PseudoCompressionFunction<T, const N: usize>: Clone {
 /// An `N`-to-1 compression function.
 pub trait CompressionFunction<T, const N: usize>: PseudoCompressionFunction<T, N> {}
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct TruncatedPermutation<InnerP, const N: usize, const CHUNK: usize, const WIDTH: usize> {
     inner_permutation: InnerP,
+}
+
+unsafe impl<InnerP: Send, const N: usize, const CHUNK: usize, const WIDTH: usize> Send
+    for TruncatedPermutation<InnerP, N, CHUNK, WIDTH>
+{
+}
+
+unsafe impl<InnerP: Sync, const N: usize, const CHUNK: usize, const WIDTH: usize> Sync
+    for TruncatedPermutation<InnerP, N, CHUNK, WIDTH>
+{
 }
 
 impl<InnerP, const N: usize, const CHUNK: usize, const WIDTH: usize>
@@ -43,7 +53,7 @@ where
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct CompressionFunctionFromHasher<T, H, const N: usize, const CHUNK: usize>
 where
     T: Clone,

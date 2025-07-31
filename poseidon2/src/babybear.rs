@@ -23,6 +23,9 @@ pub const MATRIX_DIAG_24_BABYBEAR: [u64; 24] = [
 #[derive(Debug, Clone, Default)]
 pub struct DiffusionMatrixBabybear;
 
+unsafe impl Send for DiffusionMatrixBabybear {}
+unsafe impl Sync for DiffusionMatrixBabybear {}
+
 impl<AF: AbstractField<F = BabyBear>> Permutation<[AF; 16]> for DiffusionMatrixBabybear {
     fn permute_mut(&self, state: &mut [AF; 16]) {
         matmul_internal::<AF, 16>(state, MATRIX_DIAG_16_BABYBEAR);

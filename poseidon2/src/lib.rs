@@ -27,7 +27,7 @@ use rand::Rng;
 const SUPPORTED_WIDTHS: [usize; 8] = [2, 3, 4, 8, 12, 16, 20, 24];
 
 /// The Poseidon2 permutation.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Poseidon2<F, Diffusion, const WIDTH: usize, const D: u64> {
     /// The number of external rounds.
     rounds_f: usize,
@@ -40,6 +40,16 @@ pub struct Poseidon2<F, Diffusion, const WIDTH: usize, const D: u64> {
 
     /// The linear layer used in internal rounds (only needs diffusion property, not MDS).
     internal_linear_layer: Diffusion,
+}
+
+unsafe impl<F: Send, Diffusion: Send, const WIDTH: usize, const D: u64> Send
+    for Poseidon2<F, Diffusion, WIDTH, D>
+{
+}
+
+unsafe impl<F: Sync, Diffusion: Sync, const WIDTH: usize, const D: u64> Sync
+    for Poseidon2<F, Diffusion, WIDTH, D>
+{
 }
 
 impl<F, Diffusion, const WIDTH: usize, const D: u64> Poseidon2<F, Diffusion, WIDTH, D>

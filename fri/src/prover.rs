@@ -19,11 +19,13 @@ pub fn prove<F, M, Challenger>(
     challenger: &mut Challenger,
 ) -> (FriProof<F, M, Challenger::Witness>, Vec<usize>)
 where
-    F: TwoAdicField,
+    F: TwoAdicField + Send + Sync,
     M: DirectMmcs<F> + Send + Sync,
-    Challenger: GrindingChallenger + CanObserve<M::Commitment> + CanSample<F>,
-    <M as Mmcs<F>>::Proof: Send,
-    <M as Mmcs<F>>::ProverData: Send + Sync,
+    M::Commitment: Send + Sync,
+    M::Proof: Send + Sync,
+    M::ProverData: Send + Sync,
+    Challenger: GrindingChallenger + CanObserve<M::Commitment> + CanSample<F> + Send + Sync,
+    Challenger::Witness: Send + Sync,
 {
     let log_max_height = input.iter().rposition(Option::is_some).unwrap();
 
@@ -61,6 +63,7 @@ fn answer_query<F, M>(
 where
     F: Field,
     M: Mmcs<F>,
+    M::Proof: Send + Sync,
 {
     let commit_phase_openings = commit_phase_commits
         .iter()
@@ -98,6 +101,7 @@ fn commit_phase<F, M, Challenger>(
 where
     F: TwoAdicField,
     M: DirectMmcs<F>,
+    M::Commitment: Send + Sync,
     Challenger: CanObserve<M::Commitment> + CanSample<F>,
 {
     let mut current = input[log_max_height].as_ref().unwrap().clone();

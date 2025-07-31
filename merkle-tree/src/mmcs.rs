@@ -26,6 +26,21 @@ pub struct FieldMerkleTreeMmcs<P, H, C, const DIGEST_ELEMS: usize> {
     _phantom: PhantomData<P>,
 }
 
+impl<P, H, C, const DIGEST_ELEMS: usize> Default for FieldMerkleTreeMmcs<P, H, C, DIGEST_ELEMS>
+where
+    P: PackedField,
+    H: CryptographicHasher<P, [P; DIGEST_ELEMS]> + Default,
+    C: PseudoCompressionFunction<[P; DIGEST_ELEMS], 2> + Default,
+{
+    fn default() -> Self {
+        Self {
+            hash: H::default(),
+            compress: C::default(),
+            _phantom: PhantomData,
+        }
+    }
+}
+
 impl<P, H, C, const DIGEST_ELEMS: usize> FieldMerkleTreeMmcs<P, H, C, DIGEST_ELEMS> {
     pub fn new(hash: H, compress: C) -> Self {
         Self {
@@ -39,13 +54,13 @@ impl<P, H, C, const DIGEST_ELEMS: usize> FieldMerkleTreeMmcs<P, H, C, DIGEST_ELE
 impl<P, H, C, const DIGEST_ELEMS: usize> Mmcs<P::Scalar>
     for FieldMerkleTreeMmcs<P, H, C, DIGEST_ELEMS>
 where
-    P: PackedField,
+    P: PackedField + Send + Sync,
     H: CryptographicHasher<P::Scalar, [P::Scalar; DIGEST_ELEMS]>,
     H: CryptographicHasher<P, [P; DIGEST_ELEMS]>,
-    H: Sync,
+    H: Send + Sync,
     C: PseudoCompressionFunction<[P::Scalar; DIGEST_ELEMS], 2>,
     C: PseudoCompressionFunction<[P; DIGEST_ELEMS], 2>,
-    C: Sync,
+    C: Send + Sync,
     [P::Scalar; DIGEST_ELEMS]: Serialize + for<'de> Deserialize<'de>,
 {
     type ProverData = FieldMerkleTree<P::Scalar, DIGEST_ELEMS>;
@@ -157,13 +172,13 @@ where
 impl<P, H, C, const DIGEST_ELEMS: usize> DirectMmcs<P::Scalar>
     for FieldMerkleTreeMmcs<P, H, C, DIGEST_ELEMS>
 where
-    P: PackedField,
+    P: PackedField + Send + Sync,
     H: CryptographicHasher<P::Scalar, [P::Scalar; DIGEST_ELEMS]>,
     H: CryptographicHasher<P, [P; DIGEST_ELEMS]>,
-    H: Sync,
+    H: Send + Sync,
     C: PseudoCompressionFunction<[P::Scalar; DIGEST_ELEMS], 2>,
     C: PseudoCompressionFunction<[P; DIGEST_ELEMS], 2>,
-    C: Sync,
+    C: Send + Sync,
     [P::Scalar; DIGEST_ELEMS]: Serialize + for<'de> Deserialize<'de>,
 {
     fn commit(
