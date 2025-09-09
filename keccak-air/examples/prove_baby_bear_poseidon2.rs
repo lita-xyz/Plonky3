@@ -3,7 +3,7 @@ use p3_challenger::DuplexChallenger;
 use p3_commit::ExtensionMmcs;
 use p3_dft::Radix2DitParallel;
 use p3_field::extension::BinomialExtensionField;
-use p3_field::Field;
+use p3_field::{AbstractField, Field};
 use p3_fri::{FriConfig, TwoAdicFriPcs, TwoAdicFriPcsConfig};
 use p3_keccak_air::{generate_trace_rows, KeccakAir};
 use p3_matrix::dense::RowMajorMatrix;
@@ -54,7 +54,7 @@ fn main() -> Result<(), VerificationError> {
     type Challenger = DuplexChallenger<Val, Perm, 16>;
 
     let fri_config = FriConfig {
-        log_blowup: 1,
+        log_blowup: 2,
         num_queries: 100,
         proof_of_work_bits: 16,
         mmcs: challenge_mmcs,
@@ -84,6 +84,6 @@ fn main() -> Result<(), VerificationError> {
         &KeccakAir {},
         &mut challenger,
         &proof,
-        &RowMajorMatrix::new(vec![], 0),
+        &RowMajorMatrix::new(vec![Val::zero()], 1),
     )
 }

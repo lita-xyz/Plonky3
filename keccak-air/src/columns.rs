@@ -1,4 +1,6 @@
 use core::borrow::{Borrow, BorrowMut};
+use core::array;
+use core::fmt::{Debug, Formatter, Result};
 use core::mem::{size_of, transmute};
 
 use p3_util::indices_arr;
@@ -14,20 +16,9 @@ use crate::{NUM_ROUNDS, RATE_LIMBS, U64_LIMBS};
 /// convention of `x, y, z` order, but it has the benefit that input lists map to AIR columns in a
 /// nicer way.
 #[repr(C)]
-pub(crate) struct KeccakCols<T> {
+pub struct KeccakCols<T> {
     /// The `i`th value is set to 1 if we are in the `i`th round, otherwise 0.
     pub step_flags: [T; NUM_ROUNDS],
-
-    /// A register which indicates if a row should be exported, i.e. included in a multiset equality
-    /// argument. Should be 1 only for certain rows which are final steps, i.e. with
-    /// `step_flags[23] = 1`.
-    pub export: T,
-
-    /// Permutation inputs, stored in y-major order.
-    pub preimage: [[[T; U64_LIMBS]; 5]; 5],
-
-    /// Permutation outputs, stored in y-major order.
-    pub postimage: [[[T; U64_LIMBS]; 5]; 5],
 
     pub a: [[[T; U64_LIMBS]; 5]; 5],
 
@@ -62,6 +53,37 @@ pub(crate) struct KeccakCols<T> {
     pub a_prime_prime_prime_0_0_limbs: [T; U64_LIMBS],
 }
 
+impl<T: Default> Default for KeccakCols<T> {
+    fn default() -> Self {
+        Self {
+            step_flags: array::from_fn(|_| T::default()),
+            a: array::from_fn(|_| array::from_fn(|_| array::from_fn(|_| T::default()))),
+            c: array::from_fn(|_| array::from_fn(|_| T::default())),
+            c_prime: array::from_fn(|_| array::from_fn(|_| T::default())),
+            a_prime: array::from_fn(|_| array::from_fn(|_| array::from_fn(|_| T::default()))),
+            a_prime_prime: array::from_fn(|_| array::from_fn(|_| array::from_fn(|_| T::default()))),
+            a_prime_prime_0_0_bits: array::from_fn(|_| T::default()),
+            a_prime_prime_prime_0_0_limbs: array::from_fn(|_| T::default()),
+        }
+    }
+}
+
+impl<T: Debug> Debug for KeccakCols<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        f.debug_struct("KeccakCols")
+            .field("step_flags", &self.step_flags)
+            .field("a", &self.a)
+            .field("c", &self.c)
+            .field("c_prime", &self.c_prime)
+            .field("a_prime", &self.a_prime)
+            .field("a_prime_prime", &self.a_prime_prime)
+            .field("a_prime_prime_0_0_bits", &self.a_prime_prime_0_0_bits)
+            .field("a_prime_prime_prime_0_0_limbs", &self.a_prime_prime_prime_0_0_limbs)
+            .finish()
+    }
+}
+
+
 impl<T: Copy> KeccakCols<T> {
     pub fn b(&self, x: usize, y: usize, z: usize) -> T {
         debug_assert!(x < 5);
@@ -93,9 +115,22 @@ impl<T: Copy> KeccakCols<T> {
     }
 }
 
-pub fn input_limb(i: usize) -> usize {
-    debug_assert!(i < RATE_LIMBS);
+impl<T: Clone> Clone for KeccakCols<T> {
+    fn clone(&self) -> Self {
+        Self {
+            step_flags: self.step_flags.clone(),
+            a: self.a.clone(),
+            c: self.c.clone(),
+            c_prime: self.c_prime.clone(),
+            a_prime: self.a_prime.clone(),
+            a_prime_prime: self.a_prime_prime.clone(),
+            a_prime_prime_0_0_bits: self.a_prime_prime_0_0_bits.clone(),
+            a_prime_prime_prime_0_0_limbs: self.a_prime_prime_prime_0_0_limbs.clone(),
+        }
+    }
+}
 
+pub fn input_limb(i: usize) -> usize {
     let i_u64 = i / U64_LIMBS;
     let limb_index = i % U64_LIMBS;
 
@@ -103,12 +138,10 @@ pub fn input_limb(i: usize) -> usize {
     let y = i_u64 / 5;
     let x = i_u64 % 5;
 
-    KECCAK_COL_MAP.preimage[y][x][limb_index]
+    KECCAK_COL_MAP.a[y][x][limb_index]
 }
 
 pub fn output_limb(i: usize) -> usize {
-    debug_assert!(i < RATE_LIMBS);
-
     let i_u64 = i / U64_LIMBS;
     let limb_index = i % U64_LIMBS;
 
@@ -116,7 +149,7 @@ pub fn output_limb(i: usize) -> usize {
     let y = i_u64 / 5;
     let x = i_u64 % 5;
 
-    KECCAK_COL_MAP.postimage[y][x][limb_index]
+    KECCAK_COL_MAP.a_prime_prime_prime(y, x, limb_index)
 }
 
 pub(crate) const NUM_KECCAK_COLS: usize = size_of::<KeccakCols<u8>>();

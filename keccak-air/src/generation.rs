@@ -1,8 +1,7 @@
 use alloc::vec;
 use alloc::vec::Vec;
 use core::iter;
-
-use p3_field::PrimeField64;
+use p3_field::PrimeField32;
 use p3_matrix::dense::RowMajorMatrix;
 use tracing::instrument;
 
@@ -12,7 +11,7 @@ use crate::logic::{andn, xor};
 use crate::{BITS_PER_LIMB, NUM_ROUNDS, U64_LIMBS};
 
 #[instrument(name = "generate Keccak trace", skip_all)]
-pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<[u64; 25]>) -> RowMajorMatrix<F> {
+pub fn generate_trace_rows<F: PrimeField32>(inputs: Vec<[u64; 25]>) -> RowMajorMatrix<F> {
     let num_rows = (inputs.len() * NUM_ROUNDS).next_power_of_two();
     let mut trace =
         RowMajorMatrix::new(vec![F::zero(); num_rows * NUM_KECCAK_COLS], NUM_KECCAK_COLS);
@@ -30,26 +29,13 @@ pub fn generate_trace_rows<F: PrimeField64>(inputs: Vec<[u64; 25]>) -> RowMajorM
 }
 
 /// `rows` will normally consist of 24 rows, with an exception for the final row.
-fn generate_trace_rows_for_perm<F: PrimeField64>(rows: &mut [KeccakCols<F>], input: [u64; 25]) {
-    // Populate the preimage for each row.
-    for row in rows.iter_mut() {
-        for y in 0..5 {
-            for x in 0..5 {
-                let input_xy = input[y * 5 + x];
-                for limb in 0..U64_LIMBS {
-                    row.preimage[y][x][limb] =
-                        F::from_canonical_u64((input_xy >> (16 * limb)) & 0xFFFF);
-                }
-            }
-        }
-    }
-
+fn generate_trace_rows_for_perm<F: PrimeField32>(rows: &mut [KeccakCols<F>], input: [u64; 25]) {
     // Populate the round input for the first round.
     for y in 0..5 {
         for x in 0..5 {
             let input_xy = input[y * 5 + x];
             for limb in 0..U64_LIMBS {
-                rows[0].a[y][x][limb] = F::from_canonical_u64((input_xy >> (16 * limb)) & 0xFFFF);
+                rows[0].a[y][x][limb] = F::from_canonical_u64((input_xy >> (8 * limb)) & 0xFF);
             }
         }
     }
@@ -70,7 +56,7 @@ fn generate_trace_rows_for_perm<F: PrimeField64>(rows: &mut [KeccakCols<F>], inp
     }
 }
 
-fn generate_trace_row_for_round<F: PrimeField64>(row: &mut KeccakCols<F>, round: usize) {
+fn generate_trace_row_for_round<F: PrimeField32>(row: &mut KeccakCols<F>, round: usize) {
     row.step_flags[round] = F::one();
 
     // Populate C[x] = xor(A[x, 0], A[x, 1], A[x, 2], A[x, 3], A[x, 4]).
@@ -79,7 +65,7 @@ fn generate_trace_row_for_round<F: PrimeField64>(row: &mut KeccakCols<F>, round:
             let limb = z / BITS_PER_LIMB;
             let bit_in_limb = z % BITS_PER_LIMB;
             let a = (0..5).map(|y| {
-                let a_limb = row.a[y][x][limb].as_canonical_u64() as u16;
+                let a_limb = row.a[y][x][limb].as_canonical_u64();
                 ((a_limb >> bit_in_limb) & 1) != 0
             });
             row.c[x][z] = F::from_bool(a.fold(false, |acc, x| acc ^ x));
@@ -106,7 +92,7 @@ fn generate_trace_row_for_round<F: PrimeField64>(row: &mut KeccakCols<F>, round:
             for z in 0..64 {
                 let limb = z / BITS_PER_LIMB;
                 let bit_in_limb = z % BITS_PER_LIMB;
-                let a_limb = row.a[y][x][limb].as_canonical_u64() as u16;
+                let a_limb = row.a[y][x][limb].as_canonical_u64() as u8;
                 let a_bit = F::from_bool(((a_limb >> bit_in_limb) & 1) != 0);
                 row.a_prime[y][x][z] = xor([a_bit, row.c[x][z], row.c_prime[x][z]]);
             }
@@ -152,6 +138,7 @@ fn generate_trace_row_for_round<F: PrimeField64>(row: &mut KeccakCols<F>, round:
     for limb in 0..U64_LIMBS {
         let rc_lo = rc_value_limb(round, limb);
         row.a_prime_prime_prime_0_0_limbs[limb] =
-            F::from_canonical_u16(row.a_prime_prime[0][0][limb].as_canonical_u64() as u16 ^ rc_lo);
+            F::from_canonical_u8(row.a_prime_prime[0][0][limb].as_canonical_u64() as u8 ^ rc_lo);
     }
+
 }
